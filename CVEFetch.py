@@ -1,7 +1,7 @@
 import argparse
 import datetime
+import json
 import requests
-import urllib
 
 
 # CVEFetch makes use of the NIST APIs, the full documentation to these cane be found at the address bellow
@@ -10,10 +10,11 @@ CVE_API_URL = 'https://services.nvd.nist.gov/rest/json/cves/2.0?'
 CVE_CHANGE_API_URL = 'https://services.nvd.nist.gov/rest/json/cvehistory/2.0?'
 
 API_KEY_LOCATION = 'key.txt'
+DEBUG_DATA_LOCATION = 'data.json'
 
 def fetch_api_key():
     with open(API_KEY_LOCATION, 'r') as f:
-        data = f.readlines()
+        data = f.readline()
     return data
 
 
@@ -35,7 +36,12 @@ def call_api(params, index=0):
     request_string += '' if params.cve is None else params.cve
 
     response = requests.get(request_string)
-    return response.json()
+    return json.loads(response.text)
+
+def call_api_debug(params, index=0):
+    with open(DEBUG_DATA_LOCATION, 'r') as f:
+        data = f.read()
+    return json.loads(data)
 
 def fetch_command_line_arguments():
     parser = argparse.ArgumentParser(description='CVEFetch')
@@ -51,7 +57,7 @@ def fetch_command_line_arguments():
     parser.add_argument('-k', '--keyword',
                         help='Search keywords, default None',
                         default=None)
-    parser.add_argument('-h', '--high',
+    parser.add_argument('-i', '--info',
                         help='Only return high level information (used for statistics)',
                         type=bool,
                         default=False)
@@ -62,16 +68,62 @@ def fetch_command_line_arguments():
                         help='Specifies to use a NIST API key, the key must be in key.txt under the same folder',
                         type=bool,
                         default=False)
+    parser.add_argument('-d', '--debug',
+                        help='Debug mode, requires a file named data.json under the same folder',
+                        type=bool,
+                        default=True)
     parser.parse_args(namespace=argparse.Namespace())
 
     args = parser.parse_args()
     return args
 
+def parse_individual_cve(individual_cve):
+    return_lines = []
+
+
+
+    return return_lines
+
+def parse_cve_results(cve_results, info_only):
+    return_lines = []
+
+    # Parse general metadata
+    total_results = cve_results['totalResults']
+    time_stamp = cve_results['timestamp']
+
+    return_lines.append(f'This report was generated at {time_stamp}\n')
+    return_lines.append(f'This report contains {total_results} CVEs\n\n\n')
+
+    if info_only:
+        return return_lines
+
+    vulnerabilities = cve_results['vulnerabilities']
+
+    for cve in vulnerabilities:
+        return_lines.extend(parse_individual_cve(cve))
+
+
+
+
+def parse_history_results(history_results):
+    pass
+
 if __name__ == '__main__':
     # Fetch command line arguments
     params = fetch_command_line_arguments()
-    # Call proper API based on the arguments
-    result = call_api(params=params)
-    # Output result to txt file
+
+    # Get the data from the right source based on debug execution mode
+    if params.debug:
+        result = call_api_debug(params)
+    else:
+        result = call_api(params=params)
+
+    # Parse the result
+    if params.mode == 'CVE':
+        parse_cve_results(result, params.info)
+    else:
+        parse_history_results(result)
+
+    # Output the results
     print(result)
 
