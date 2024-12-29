@@ -1,8 +1,8 @@
 import argparse
 import datetime
 import json
-import requests
 
+import CWEDataSource
 import NISTApiCall
 import NISTDataSource
 
@@ -20,6 +20,7 @@ CWE_INFO_LOCATION = 'cwe.csv'                           # The separator is a : c
 
 # Dict used to hold the CWE information after it is loaded
 CWE_INFO = {}
+DATA_SOURCE_INFO = None
 
 def fetch_cwe_info():
     with open(CWE_INFO_LOCATION, 'r', encoding='utf-8') as f:
@@ -41,7 +42,7 @@ def call_cve_api(params, index=0):
     request_string += '' + '&' if params.keyword is None else params.keyword + '&'
     request_string += '' + '&' if params.cve is None else params.cve + '&'
 
-    return NISTApiCall.call_nist_api(params.nistapikey, request_string, index)
+    return NISTApiCall.call_nist_api(params.nistapikey, request_string)
 
 def call_cve_api_debug(params, index=0):
     with open(DEBUG_DATA_LOCATION, 'r') as f:
@@ -83,8 +84,30 @@ def fetch_command_line_arguments():
     return args
 
 def parse_individual_cve(individual_cve):
+    spacer = '\n'
+    indent = '\t'
     return_lines = []
-    id = individual_cve['id']
+    id_line = f'{individual_cve['id']}{spacer}'
+    return_lines.append(id_line)
+
+    # TODO Source_identifier will need improvement, this is just to get everything working
+    source_identifier = individual_cve['sourceIdentifier']
+    if source_identifier in DATA_SOURCE_INFO:
+        # We already have the info!!
+        source_data = DATA_SOURCE_INFO[source_identifier]
+        data_source_name_line = f'{indent}Submitter: {source_data['name']}{spacer}'
+        return_lines.append(data_source_name_line)
+        data_source_first_date_line = f'{indent}Submitter active since: {source_data["date_first_submission"]}{spacer}'
+        return_lines.append(data_source_first_date_line)
+        data_source_contact_info = f'{indent}Submitter contact info: {source_data["contact_mail"]}{spacer}'
+    else:
+        # Local source identifiers are out of date
+        print('WARNING - Local source identifiers are out of date, please update!')
+        print(f'INFO - Trying to fetch source identifier from NVD for: {source_identifier}')
+        NISTDataSource.call_datasource_api(source_identifier)
+
+    return_lines.append(spacer)
+
 
 
 
@@ -92,6 +115,7 @@ def parse_individual_cve(individual_cve):
     return return_lines
 
 def parse_cve_results(cve_results, info_only):
+    section_change = '\n\n\n'
     return_lines = []
 
     # Parse general metadata
@@ -99,7 +123,8 @@ def parse_cve_results(cve_results, info_only):
     time_stamp = cve_results['timestamp']
 
     return_lines.append(f'This report was generated at {time_stamp}\n')
-    return_lines.append(f'This report contains {total_results} CVEs\n\n\n')
+    return_lines.append(f'This report contains {total_results} CVEs\n')
+    return_lines.append(section_change)
 
     if info_only:
         return return_lines
@@ -108,8 +133,9 @@ def parse_cve_results(cve_results, info_only):
 
     for cve in vulnerabilities:
         return_lines.extend(parse_individual_cve(cve['cve']))
+        return_lines.append(section_change)
 
-
+    return return_lines
 
 
 def parse_history_results(history_results):
@@ -117,23 +143,21 @@ def parse_history_results(history_results):
 
 if __name__ == '__main__':
     # Load local data
-    fetch_cwe_info()
+    CWE_INFO = CWEDataSource.fetch_cwe_info()
+    DATA_SOURCE_INFO = NISTDataSource.fetch_data_source()
 
     # Fetch command line arguments
     params = fetch_command_line_arguments()
 
     # Get the data from the right source based on debug execution mode
     if params.debug:
-        result = call_cve_api_debug(params)
+        cves = call_cve_api_debug(params)
     else:
-        result = call_cve_api(params=params)
+        cves = call_cve_api(params=params)
 
-    # Parse the result
-    if params.mode == 'CVE':
-        parse_cve_results(result, params.info)
-    else:
-        parse_history_results(result)
+    parsed_cves = parse_cve_results(cves, info_only=params.info)
+    print(parsed_cves)
+    quit()
 
-    # Output the results
-    print(result)
+
 
