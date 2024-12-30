@@ -2,6 +2,7 @@ import argparse
 import datetime
 import json
 
+import CPEDecoder
 import CWEDataSource
 import NISTApiCall
 import NISTDataSource
@@ -25,11 +26,46 @@ DATA_SOURCE_INFO = None
 # Data output configuration
 SPACER = '\n'
 INDENT = '\t'
+SECTION_CHANGE = '\n\n'
 
-def add_indent(string_list):
+def fetch_command_line_arguments():
+    parser = argparse.ArgumentParser(description='CVEFetch')
+    parser.add_argument('-m', '--mode',
+                        help='What mode to use? CVE|HISTORY, default CVE',
+                        default='CVE')
+    parser.add_argument('-s', '--start',
+                        help='From date, default yesterday',
+                        default=(datetime.date.today() - datetime.timedelta(days=53)).isoformat())
+    parser.add_argument('-e', '--end',
+                        help='To date, default today',
+                        default=(datetime.date.today() - datetime.timedelta(days=50)).isoformat())
+    parser.add_argument('-k', '--keyword',
+                        help='Search keywords, default None',
+                        default=None)
+    parser.add_argument('-i', '--info',
+                        help='Only return high level information (used for statistics)',
+                        type=bool,
+                        default=False)
+    parser.add_argument('-c', '--cve',
+                        help='Return information for a specific CVE',
+                        default=None)
+    parser.add_argument('-n', '--nistapikey',
+                        help='Specifies to use a NIST API key, the key must be in key.txt under the same folder',
+                        type=bool,
+                        default=False)
+    parser.add_argument('-d', '--debug',
+                        help='Debug mode, requires a file named data.json under the same folder',
+                        type=bool,
+                        default=False)
+    parser.parse_args(namespace=argparse.Namespace())
+
+    args = parser.parse_args()
+    return args
+
+def add_indent(string_list, quantity=1):
     new_list = []
     for item in string_list:
-        new_item = INDENT + item
+        new_item = (INDENT * quantity) + item
         new_list.append(new_item)
     return new_list
 
@@ -59,40 +95,6 @@ def call_cve_api_debug(params, index=0):
     with open(DEBUG_DATA_LOCATION, 'r') as f:
         data = f.read()
     return json.loads(data)
-
-def fetch_command_line_arguments():
-    parser = argparse.ArgumentParser(description='CVEFetch')
-    parser.add_argument('-m', '--mode',
-                        help='What mode to use? CVE|HISTORY, default CVE',
-                        default='CVE')
-    parser.add_argument('-s', '--start',
-                        help='From date, default yesterday',
-                        default=(datetime.date.today() - datetime.timedelta(days=1)).isoformat())
-    parser.add_argument('-e', '--end',
-                        help='To date, default today',
-                        default=datetime.date.today().isoformat())
-    parser.add_argument('-k', '--keyword',
-                        help='Search keywords, default None',
-                        default=None)
-    parser.add_argument('-i', '--info',
-                        help='Only return high level information (used for statistics)',
-                        type=bool,
-                        default=False)
-    parser.add_argument('-c', '--cve',
-                        help='Return information for a specific CVE',
-                        default=None)
-    parser.add_argument('-n', '--nistapikey',
-                        help='Specifies to use a NIST API key, the key must be in key.txt under the same folder',
-                        type=bool,
-                        default=False)
-    parser.add_argument('-d', '--debug',
-                        help='Debug mode, requires a file named data.json under the same folder',
-                        type=bool,
-                        default=True)
-    parser.parse_args(namespace=argparse.Namespace())
-
-    args = parser.parse_args()
-    return args
 
 def parse_source_identifier(source_identifier, cve='N/A'):
     # TODO this needs improvement for edge cases and local cache management
@@ -227,6 +229,14 @@ def parse_description(individual_cve):
 
     return return_lines
 
+def parse_tags(individual_cve):
+    return_lines = []
+    tags = individual_cve['cveTags']
+    for tag_details in tags:
+        for tag in tag_details['tags']:
+            return_lines.append(f'Tags:{tag} {INDENT} Source: {tag_details["sourceIdentifier"]}{SPACER}')
+    return return_lines
+
 def parse_individual_cve(individual_cve):
     return_lines = []
     cve = individual_cve['id']
@@ -235,10 +245,23 @@ def parse_individual_cve(individual_cve):
 
     return_lines.append(f'{INDENT}CVE Submitter information:{SPACER}')
     source_identifier = individual_cve['sourceIdentifier']
-    return_lines.extend(add_indent(parse_source_identifier(source_identifier, cve)))
+    return_lines.extend(add_indent(parse_source_identifier(source_identifier, cve), quantity=2))
 
-    status_line = f'{SPACER}{INDENT}Vulnerability status: {individual_cve["vulnStatus"]}{SPACER}'
+    return_lines.append(f'{SPACER}')
+    status_line = f'{INDENT}Vulnerability status: {individual_cve["vulnStatus"]}{SPACER}'
     return_lines.append(status_line)
+
+    if 'cveTags' in individual_cve.keys() and len(individual_cve['cveTags']) > 0:
+        return_lines.append(f'{SPACER}')
+        return_lines.append(f'{INDENT}Vulnerability tags:{SPACER}')
+        return_lines.extend(add_indent(parse_tags(individual_cve), quantity=2))
+    else:
+        return_lines.append(f'{SPACER}{INDENT}Vulnerability tags: No tags infos for this CVE{SPACER}')
+
+    if 'configuration' in individual_cve.keys() and len(individual_cve['configuration']) > 0:
+        print('Got vulnerability configuration')
+    else:
+        return_lines.append(f'{SPACER}{INDENT}Vulnerability configuration: No configuration infos for this CVE{SPACER}')
 
     # TODO Impacted product information
 
@@ -263,7 +286,6 @@ def parse_individual_cve(individual_cve):
     return return_lines
 
 def parse_cve_results(cve_results, info_only):
-    section_change = '\n\n\n'
     return_lines = []
 
     # Parse general metadata
@@ -272,7 +294,7 @@ def parse_cve_results(cve_results, info_only):
 
     return_lines.append(f'This report was generated at {time_stamp}\n')
     return_lines.append(f'This report contains {total_results} CVEs\n')
-    return_lines.append(section_change)
+    return_lines.append(SECTION_CHANGE)
 
     if info_only:
         return return_lines
@@ -281,7 +303,7 @@ def parse_cve_results(cve_results, info_only):
 
     for cve in vulnerabilities:
         return_lines.extend(parse_individual_cve(cve['cve']))
-        return_lines.append(section_change)
+        return_lines.append(SECTION_CHANGE)
 
     return return_lines
 
