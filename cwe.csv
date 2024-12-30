@@ -1445,3 +1445,4 @@
 1423:Exposure of Sensitive Information caused by Shared Microarchitectural Predictor State that Influences Transient Execution
 1426:Improper Validation of Generative AI Output
 1427:Improper Neutralization of Input Used for LLM Prompting
+255:Credentials Management Errors

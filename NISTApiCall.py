@@ -1,5 +1,6 @@
 import json
 import requests
+import time
 
 
 # The following are all constants used to locate data on the local hard drive
@@ -23,6 +24,9 @@ def call_nist_api(use_api_key, url):
         response = requests.get(url, headers={'apiKey': api_key})
     else:
         response = requests.get(url)
+
+    # Just an effort to not blast out the API
+    time.sleep(1)
 
     return json.loads(response.text)
 

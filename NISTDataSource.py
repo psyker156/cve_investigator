@@ -30,7 +30,7 @@ def fetch_data_source():
     return result_dict
 
 
-def update_datasource_local_cache(use_api_key):
+def update_datasource_local_cache(use_api_key=False):
     request_string = ''
     request_string += NIST_DATA_SOURCE_API_URL
     data = NISTApiCall.call_nist_api(use_api_key, request_string)
@@ -41,17 +41,11 @@ def update_datasource_local_cache(use_api_key):
     parsed_sources = []
 
     for single_source in sources:
-        name = single_source['name'].replace(';', '')
-        created = single_source['created'].replace(';', '')
-        id = ''
-        emails = ''
-
-        for identifier in single_source['sourceIdentifiers']:
-            if '@' in identifier:
-                emails += f'{identifier}, '.replace(';', '')
-            else:
-                id += identifier.replace(';', '')
-        data_line = f'{id};{name};{created};{emails}'
+        parsed_source = parse_single_source(single_source)
+        data_line = (f'{parsed_source['id']};'
+                     f'{parsed_source['name']};'
+                     f'{parsed_source['created']};'
+                     f'{parsed_source['emails']}')
         parsed_sources.append(data_line)
 
     with open(DATA_SOURCE_LOCAL_CACHE_LOCATION, 'w', encoding='utf-8') as f:
@@ -60,12 +54,31 @@ def update_datasource_local_cache(use_api_key):
 
     print('Data source local cache has been updated')
 
+def parse_single_source(single_source):
+    name = single_source['name'].replace(';', '')
+    created = single_source['created'].replace(';', '')
+    id = ''
+    emails = ''
+
+    for identifier in single_source['sourceIdentifiers']:
+        if '@' in identifier:
+            emails += f'{identifier}, '.replace(';', '')
+        else:
+            id += identifier.replace(';', '')
+
+    return {'id': id, 'name': name, 'created': created, 'emails': emails}
+
+
+
 def call_datasource_api(datasource, use_api_key=False):
     request_string = ''
     request_string += NIST_DATA_SOURCE_API_URL
     request_string += 'sourceIdentifier=' + str(datasource) + '&'
-    NISTApiCall.call_nist_api(use_api_key, request_string)
+    result = NISTApiCall.call_nist_api(use_api_key, request_string)
+    result = parse_single_source(result['sources'][0])
+    return result
 
 if __name__ == '__main__':
     update_datasource_local_cache()
+
 

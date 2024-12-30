@@ -84,7 +84,6 @@ data.json
 
 #NIST data source file
 data_source.csv
-data_source.csv
 
 #Avoid all *.pyc
 *.pyc

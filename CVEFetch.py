@@ -22,6 +22,17 @@ CWE_INFO_LOCATION = 'cwe.csv'                           # The separator is a : c
 CWE_INFO = {}
 DATA_SOURCE_INFO = None
 
+# Data output configuration
+SPACER = '\n'
+INDENT = '\t'
+
+def add_indent(string_list):
+    new_list = []
+    for item in string_list:
+        new_item = INDENT + item
+        new_list.append(new_item)
+    return new_list
+
 def fetch_cwe_info():
     with open(CWE_INFO_LOCATION, 'r', encoding='utf-8') as f:
         data = f.readlines()
@@ -83,35 +94,172 @@ def fetch_command_line_arguments():
     args = parser.parse_args()
     return args
 
-def parse_individual_cve(individual_cve):
-    spacer = '\n'
-    indent = '\t'
-    return_lines = []
-    id_line = f'{individual_cve['id']}{spacer}'
-    return_lines.append(id_line)
+def parse_source_identifier(source_identifier, cve='N/A'):
+    # TODO this needs improvement for edge cases and local cache management
 
-    # TODO Source_identifier will need improvement, this is just to get everything working
-    source_identifier = individual_cve['sourceIdentifier']
+    return_lines = []
+
+    source_data = {}
     if source_identifier in DATA_SOURCE_INFO:
         # We already have the info!!
         source_data = DATA_SOURCE_INFO[source_identifier]
-        data_source_name_line = f'{indent}Submitter: {source_data['name']}{spacer}'
-        return_lines.append(data_source_name_line)
-        data_source_first_date_line = f'{indent}Submitter active since: {source_data["date_first_submission"]}{spacer}'
-        return_lines.append(data_source_first_date_line)
-        data_source_contact_info = f'{indent}Submitter contact info: {source_data["contact_mail"]}{spacer}'
+    elif '@' in source_identifier:
+        # This specific source is based on an email and not a uuid
+        print(f'WARNING - email as source identifier detected for {cve} info will be incomplete')
+        source_data['name'] = "N/A"
+        source_data['date_first_submission'] = "N/A"
+        source_data['contact_mail'] = source_identifier
     else:
         # Local source identifiers are out of date
-        print('WARNING - Local source identifiers are out of date, please update!')
+        print('WARNING - Local source identifiers may be out of date, please update!')
         print(f'INFO - Trying to fetch source identifier from NVD for: {source_identifier}')
-        NISTDataSource.call_datasource_api(source_identifier)
+        source_data = NISTDataSource.call_datasource_api(source_identifier)
 
-    return_lines.append(spacer)
+    data_source_name_line = f'Submitter: {source_data['name']}{SPACER}'
+    return_lines.append(data_source_name_line)
+    data_source_first_date_line = f'Submitter active since: {source_data["date_first_submission"]}{SPACER}'
+    return_lines.append(data_source_first_date_line)
+    data_source_contact_info = f'Submitter contact info: {source_data["contact_mail"]}{SPACER}'
+    return_lines.append(data_source_contact_info)
+
+    return return_lines
+
+def parse_individual_weakness(weakness, cve='N/A'):
+    return_lines = [f'Weakness info provider type: {weakness['type']}{SPACER}']
+    source = weakness['source']
+    return_lines.extend(parse_source_identifier(source, cve))
+
+    descriptions = weakness['description']
+    for cwe in descriptions:
+        value = cwe['value']
+        if 'CWE-' in value:
+            cwe_number = value.split('-')[1]
+            if cwe_number in CWE_INFO.keys():
+                return_lines.append(f'CWE: {value} - {CWE_INFO[cwe_number]}')
+            else:
+                return_lines.append(f'CWE: {value}')
+                print(f'WARNING - {value} not found in CWE info, local cache might be out of date')
+        else:
+            return_lines.append(f'CWE: Missing CWE info (parsing error or absent data)')
+    return return_lines
+
+def parse_weaknesses(weaknesses, cve='N/A'):
+    return_lines = [f'Weakness informations:{SPACER}']
+    for weakness in weaknesses:
+        return_lines.extend(add_indent(parse_individual_weakness(weakness, cve)))
+    return return_lines
+
+def parse_source_info_for_CVSS(metric):
+    return_lines = [f'CVSS info provider type: {metric['type']}{SPACER}']
+    source = metric['source']
+    return_lines.extend(parse_source_identifier(source))
+    return return_lines
+
+def parse_cvssMetricV40(metric):
+    return_lines = [f'{SPACER}{INDENT}CVSS Metrics ({metric['cvssData']['version']}):']
+    return_lines.extend(add_indent(parse_source_info_for_CVSS(metric)))
+    return_lines.append(f'{INDENT}Base score: {metric["cvssData"]["baseScore"]}{SPACER}')
+    return_lines.append(f'{INDENT}Attack vector: {metric["cvssData"]["attackVector"]}{SPACER}')
+    return_lines.append(f'{INDENT}Exploit maturity: {metric["cvssData"]["exploitMaturity"]}{SPACER}')
+    return_lines.append(f'{INDENT}Response effort: {metric["cvssData"]["vulnerabilityResponseEffort"]}{SPACER}')
+    return_lines.append(f'{INDENT}Provider emergency: {metric["cvssData"]["providerUrgency"]}{SPACER}')
+
+    return return_lines
 
 
+def parse_cvssMetricV31(metric):
+    return_lines = [f'{SPACER}{INDENT}CVSS Metrics ({metric['cvssData']['version']}):']
+    return_lines.extend(add_indent(parse_source_info_for_CVSS(metric)))
+    return_lines.append(f'{INDENT}Base score: {metric["cvssData"]["baseScore"]}{SPACER}')
+    return_lines.append(f'{INDENT}Attack vector: {metric["cvssData"]["attackVector"]}{SPACER}')
 
+    return return_lines
 
+def parse_cvssMetricV2(metric):
+    return_lines = [f'{SPACER}{INDENT}CVSS Metrics ({metric['cvssData']['version']}):']
+    return_lines.extend(add_indent(parse_source_info_for_CVSS(metric)))
+    return_lines.append(f'{INDENT}Base score: {metric["cvssData"]["baseScore"]}{SPACER}')
+    return_lines.append(f'{INDENT}Access vector: {metric["cvssData"]["accessVector"]}{SPACER}')
 
+    return return_lines
+
+def parse_metrics(metrics, cve='N/A'):
+    return_lines = []
+
+    metric_parser = None
+    metric_type = ''
+    if 'cvssMetricV40' in metrics.keys():
+        metric_parser = parse_cvssMetricV40
+        metric_type = metrics['cvssMetricV40']
+    elif 'cvssMetricV31' in metrics.keys():
+        metric_parser = parse_cvssMetricV31
+        metric_type = metrics['cvssMetricV31']
+    elif 'cvssMetricV2' in metrics.keys():
+        metric_parser = parse_cvssMetricV2
+        metric_type = metrics['cvssMetricV2']
+    elif len(metrics.keys()) != 0:
+        return_lines.append(f'{SPACER}{INDENT}CVSS Metrics:Error, no parser available for {metrics.keys()}')
+    else:
+        return_lines.append(f'{SPACER}{INDENT}CVSS Metrics:Error, no data available?')
+
+    if metric_parser is not None:
+        for metric in metric_type:
+            return_lines.extend(metric_parser(metric))
+
+    return return_lines
+
+def parse_description(individual_cve):
+    return_lines = []
+
+    for description in individual_cve['descriptions']:
+        if 'en' in description['lang']:
+            return_lines.append(f'Vulnerability description:{SPACER}')
+            max_line_len = 100  # Max 100 chars
+            new_line = ''
+            for word in description['value'].split():
+                if len(new_line) + len(word) + 1 < max_line_len:
+                    new_line += word + ' '
+                else:
+                    return_lines.append(f'{INDENT}{new_line}{SPACER}')
+                    new_line = ''
+            if len(new_line) > 0:
+                return_lines.append(f'{INDENT}{new_line}{SPACER}')
+
+    return return_lines
+
+def parse_individual_cve(individual_cve):
+    return_lines = []
+    cve = individual_cve['id']
+    id_line = f'{cve}{SPACER}'
+    return_lines.append(id_line)
+
+    return_lines.append(f'{INDENT}CVE Submitter information:{SPACER}')
+    source_identifier = individual_cve['sourceIdentifier']
+    return_lines.extend(add_indent(parse_source_identifier(source_identifier, cve)))
+
+    status_line = f'{SPACER}{INDENT}Vulnerability status: {individual_cve["vulnStatus"]}{SPACER}'
+    return_lines.append(status_line)
+
+    # TODO Impacted product information
+
+    # CVE Description
+    return_lines.append(f'{SPACER}')
+    return_lines.extend(add_indent(parse_description(individual_cve)))
+
+    # CWE using local cache in conjunction with the API data
+    return_lines.append(f'{SPACER}')
+    if 'weaknesses' in individual_cve.keys():
+        return_lines.extend(add_indent(parse_weaknesses(individual_cve['weaknesses'], cve)))
+    else:
+        return_lines.append(f'{SPACER}{INDENT}Weakness information: No weakness infos for this CVE{SPACER}')
+
+    # Getting CVSS information
+    if 'metrics' in individual_cve.keys():
+        return_lines.extend(add_indent(parse_metrics(individual_cve['metrics'], cve)))
+    else:
+        return_lines.append(f'{SPACER}{INDENT}CVSS Metrics: No metrics infos for this CVE{SPACER}')
+
+    return_lines.append(SPACER)
     return return_lines
 
 def parse_cve_results(cve_results, info_only):
@@ -156,7 +304,8 @@ if __name__ == '__main__':
         cves = call_cve_api(params=params)
 
     parsed_cves = parse_cve_results(cves, info_only=params.info)
-    print(parsed_cves)
+    for line in parsed_cves:
+        print(line[0:-1])
     quit()
 
 
