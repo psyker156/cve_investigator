@@ -81,6 +81,7 @@ key.txt
 
 #Debug file
 data.json
+data2.json
 
 #NIST data source file
 data_source.csv

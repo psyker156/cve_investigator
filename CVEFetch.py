@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import json
+from datetime import tzinfo
 
 import CWEDataSource
 import NISTApiCall
@@ -36,7 +37,11 @@ def fetch_command_line_arguments():
                         default='CVE')
     parser.add_argument('-y', '--yesterday',
                         help='Get yesterday\'s cves',
-                        default=True)
+                        default=False)
+    parser.add_argument('-l', '--lastx',
+                        help='Get cves for the last X hours',
+                        type=int,
+                        default=None)
     parser.add_argument('-s', '--start',
                         help='From date',
                         default=None)
@@ -60,10 +65,10 @@ def fetch_command_line_arguments():
     parser.add_argument('-d', '--debug',
                         help='Debug mode, requires a file named under the same folder',
                         type=bool,
-                        default=True)
+                        default=False)
     parser.add_argument('-f', '--file',
                         help='Specify a file name to be used for debug mode',
-                        default=None)
+                        default=DEBUG_DATA_LOCATION)
     parser.parse_args(namespace=argparse.Namespace())
 
     args = parser.parse_args()
@@ -96,9 +101,16 @@ def call_cve_api(params, index=0):
     if params.end is not None and not params.yesterday:
         request_string += 'pubEndDate=' + params.end + 'T23:59:59.999' + '&'
     if params.yesterday:
-        yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+        today = datetime.datetime.now(datetime.UTC).date()
+        yesterday = (today - datetime.timedelta(days=1)).isoformat()
         request_string += 'pubStartDate=' + yesterday + 'T00:00:00.000' + '&'
         request_string += 'pubEndDate=' + yesterday + 'T23:59:59.999' + '&'
+    if params.lastx:
+        x = params.lastx
+        right_now = datetime.datetime.now(datetime.UTC)
+        x_hours_ago = right_now - datetime.timedelta(hours=x)
+        request_string += 'pubStartDate=' + x_hours_ago.isoformat(timespec='seconds').split('+')[0] + '&'
+        request_string += 'pubEndDate=' + right_now.isoformat(timespec='seconds').split('+')[0] + '&'
     request_string += '' if params.keyword is None else 'keywordSearch=' + params.keyword + '&'
     request_string += '' if params.cve is None else 'cveId=' + params.cve + '&'
 
@@ -120,7 +132,6 @@ def parse_source_identifier(source_identifier, cve='N/A'):
         source_data = DATA_SOURCE_INFO[source_identifier]
     elif '@' in source_identifier:
         # This specific source is based on an email and not a uuid
-        # print(f'WARNING - email as source identifier detected for {cve} info will be incomplete')
         source_data['name'] = "N/A"
         source_data['date_first_submission'] = "N/A"
         source_data['contact_mail'] = source_identifier
@@ -162,7 +173,7 @@ def parse_individual_weakness(weakness, cve='N/A'):
     return return_lines
 
 def parse_weaknesses(weaknesses, cve='N/A'):
-    return_lines = [f'Weakness informations:{SPACER}']
+    return_lines = [f'Weakness infos:{SPACER}']
     for weakness in weaknesses:
         return_lines.extend(add_indent(parse_individual_weakness(weakness, cve)))
     return return_lines
@@ -174,7 +185,7 @@ def parse_source_info_for_CVSS(metric):
     return return_lines
 
 def parse_cvssMetricV40(metric):
-    return_lines = [f'{SPACER}{INDENT}CVSS Metrics ({metric['cvssData']['version']}):']
+    return_lines = [f'{SPACER}{INDENT}CVSS Metrics ({metric['cvssData']['version']}):{SPACER}']
     return_lines.extend(add_indent(parse_source_info_for_CVSS(metric)))
     return_lines.append(f'{INDENT}Base score: {metric["cvssData"]["baseScore"]}{SPACER}')
     return_lines.append(f'{INDENT}Attack vector: {metric["cvssData"]["attackVector"]}{SPACER}')
@@ -185,7 +196,7 @@ def parse_cvssMetricV40(metric):
     return return_lines
 
 def parse_cvssMetricV31(metric):
-    return_lines = [f'{SPACER}{INDENT}CVSS Metrics ({metric['cvssData']['version']}):']
+    return_lines = [f'{SPACER}{INDENT}CVSS Metrics ({metric['cvssData']['version']}):{SPACER}']
     return_lines.extend(add_indent(parse_source_info_for_CVSS(metric)))
     return_lines.append(f'{INDENT}Base score: {metric["cvssData"]["baseScore"]}{SPACER}')
     return_lines.append(f'{INDENT}Attack vector: {metric["cvssData"]["attackVector"]}{SPACER}')
@@ -193,7 +204,7 @@ def parse_cvssMetricV31(metric):
     return return_lines
 
 def parse_cvssMetricV30(metric):
-    return_lines = [f'{SPACER}{INDENT}CVSS Metrics ({metric['cvssData']['version']}):']
+    return_lines = [f'{SPACER}{INDENT}CVSS Metrics ({metric['cvssData']['version']}):{SPACER}']
     return_lines.extend(add_indent(parse_source_info_for_CVSS(metric)))
     return_lines.append(f'{INDENT}Base score: {metric["cvssData"]["baseScore"]}{SPACER}')
     return_lines.append(f'{INDENT}Attack vector: {metric["cvssData"]["attackVector"]}{SPACER}')
@@ -201,7 +212,7 @@ def parse_cvssMetricV30(metric):
     return return_lines
 
 def parse_cvssMetricV2(metric):
-    return_lines = [f'{SPACER}{INDENT}CVSS Metrics ({metric['cvssData']['version']}):']
+    return_lines = [f'{SPACER}{INDENT}CVSS Metrics ({metric['cvssData']['version']}):{SPACER}']
     return_lines.extend(add_indent(parse_source_info_for_CVSS(metric)))
     return_lines.append(f'{INDENT}Base score: {metric["cvssData"]["baseScore"]}{SPACER}')
     return_lines.append(f'{INDENT}Access vector: {metric["cvssData"]["accessVector"]}{SPACER}')
@@ -226,9 +237,9 @@ def parse_metrics(metrics, cve='N/A'):
         metric_parser = parse_cvssMetricV2
         metric_type = metrics['cvssMetricV2']
     elif len(metrics.keys()) != 0:
-        return_lines.append(f'{SPACER}{INDENT}CVSS Metrics:Error, no parser available for {metrics.keys()}')
+        return_lines.append(f'{SPACER}{INDENT}CVSS Metrics:Error, no parser available for {metrics.keys()}{SPACER}')
     else:
-        return_lines.append(f'{SPACER}{INDENT}CVSS Metrics:Error, no data available?')
+        return_lines.append(f'{SPACER}{INDENT}CVSS Metrics: Metric present but no data for it{SPACER}')
 
     if metric_parser is not None:
         for metric in metric_type:
@@ -249,7 +260,7 @@ def parse_description(individual_cve):
                     new_line += word + ' '
                 else:
                     return_lines.append(f'{INDENT}{new_line}{SPACER}')
-                    new_line = word
+                    new_line = word + ' '
             if len(new_line) > 0:
                 return_lines.append(f'{INDENT}{new_line}{SPACER}')
 
@@ -378,6 +389,11 @@ def parse_cve_results(cve_results, info_only):
 def parse_history_results(history_results):
     pass
 
+def write_to_file(data):
+    with open(f'{datetime.date.today().isoformat()}.txt', 'w', encoding='utf-8') as file:
+        for line in data:
+            file.write(line)
+
 if __name__ == '__main__':
     # Load local data
     CWE_INFO = CWEDataSource.fetch_cwe_info()
@@ -393,9 +409,7 @@ if __name__ == '__main__':
         cves = call_cve_api(params=params)
 
     parsed_cves = parse_cve_results(cves, info_only=params.info)
-    for line in parsed_cves:
-        print(line[0:-1])
-    quit()
+    write_to_file(parsed_cves)
 
 
 
