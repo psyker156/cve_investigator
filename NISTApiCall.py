@@ -27,7 +27,10 @@ def call_nist_api(use_api_key, url):
 
     # Just an effort to not blast out the API
     time.sleep(1)
-
+    print(url)
+    if response.status_code != 200:
+        print(f'ERROR - http error code {response.status_code} bailing out')
+        quit()
     return json.loads(response.text)
 
 if __name__ == '__main__':

@@ -1446,3 +1446,15 @@
 1426:Improper Validation of Generative AI Output
 1427:Improper Neutralization of Input Used for LLM Prompting
 255:Credentials Management Errors
+16:Configuration issue
+275:Permission Issues
+840:Business Logic Errors
+1018:Manage User Sessions
+701:Weaknesses Introduced During Design
+399:Resource Management Errors
+264:Permissions, Privileges, and Access Controls
+92:Improper Sanitization of Custom Special Characters
+310:Cryptographic Issues
+355:User Interface Security Issues
+189:Numeric Errors
+1218:Memory Buffer Errors

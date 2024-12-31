@@ -25,7 +25,7 @@ def parse_cpe(cpe_string):
     cpe = None
     split_cpe = cpe_string.split(':')
 
-    if split_cpe[OFFSET_CPE_EDITION] in SUPPORTED_CVE_VERSION:
+    if split_cpe[OFFSET_CPE_CPE_VERSION] in SUPPORTED_CVE_VERSION:
         cpe = {}
         cpe['part'] = split_cpe[OFFSET_CPE_PART]
         cpe['vendor'] = split_cpe[OFFSET_CPE_VENDOR]

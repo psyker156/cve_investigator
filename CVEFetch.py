@@ -2,10 +2,11 @@ import argparse
 import datetime
 import json
 
-import CPEDecoder
 import CWEDataSource
 import NISTApiCall
 import NISTDataSource
+
+from CPEDecoder import *
 
 
 # CVEFetch makes use of the NIST APIs, the full documentation to these cane be found at the address bellow
@@ -33,12 +34,15 @@ def fetch_command_line_arguments():
     parser.add_argument('-m', '--mode',
                         help='What mode to use? CVE|HISTORY, default CVE',
                         default='CVE')
+    parser.add_argument('-y', '--yesterday',
+                        help='Get yesterday\'s cves',
+                        default=True)
     parser.add_argument('-s', '--start',
-                        help='From date, default yesterday',
-                        default=(datetime.date.today() - datetime.timedelta(days=53)).isoformat())
+                        help='From date',
+                        default=None)
     parser.add_argument('-e', '--end',
-                        help='To date, default today',
-                        default=(datetime.date.today() - datetime.timedelta(days=50)).isoformat())
+                        help='To date',
+                        default=None)
     parser.add_argument('-k', '--keyword',
                         help='Search keywords, default None',
                         default=None)
@@ -52,11 +56,14 @@ def fetch_command_line_arguments():
     parser.add_argument('-n', '--nistapikey',
                         help='Specifies to use a NIST API key, the key must be in key.txt under the same folder',
                         type=bool,
-                        default=False)
+                        default=True)
     parser.add_argument('-d', '--debug',
-                        help='Debug mode, requires a file named data.json under the same folder',
+                        help='Debug mode, requires a file named under the same folder',
                         type=bool,
-                        default=False)
+                        default=True)
+    parser.add_argument('-f', '--file',
+                        help='Specify a file name to be used for debug mode',
+                        default=None)
     parser.parse_args(namespace=argparse.Namespace())
 
     args = parser.parse_args()
@@ -84,10 +91,16 @@ def call_cve_api(params, index=0):
     request_string = ''
     request_string += CVE_API_URL
     request_string += 'startIndex=' + str(index) + '&'
-    request_string += 'pubStartDate=' + params.start + 'T00:00:00.000' + '&'
-    request_string += 'pubEndDate=' + params.end + 'T23:59:59.999' + '&'
-    request_string += '' + '&' if params.keyword is None else params.keyword + '&'
-    request_string += '' + '&' if params.cve is None else params.cve + '&'
+    if params.start is not None and not params.yesterday:
+        request_string += 'pubStartDate=' + params.start + 'T00:00:00.000' + '&'
+    if params.end is not None and not params.yesterday:
+        request_string += 'pubEndDate=' + params.end + 'T23:59:59.999' + '&'
+    if params.yesterday:
+        yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+        request_string += 'pubStartDate=' + yesterday + 'T00:00:00.000' + '&'
+        request_string += 'pubEndDate=' + yesterday + 'T23:59:59.999' + '&'
+    request_string += '' if params.keyword is None else 'keywordSearch=' + params.keyword + '&'
+    request_string += '' if params.cve is None else 'cveId=' + params.cve + '&'
 
     return NISTApiCall.call_nist_api(params.nistapikey, request_string)
 
@@ -107,7 +120,7 @@ def parse_source_identifier(source_identifier, cve='N/A'):
         source_data = DATA_SOURCE_INFO[source_identifier]
     elif '@' in source_identifier:
         # This specific source is based on an email and not a uuid
-        print(f'WARNING - email as source identifier detected for {cve} info will be incomplete')
+        # print(f'WARNING - email as source identifier detected for {cve} info will be incomplete')
         source_data['name'] = "N/A"
         source_data['date_first_submission'] = "N/A"
         source_data['contact_mail'] = source_identifier
@@ -139,8 +152,11 @@ def parse_individual_weakness(weakness, cve='N/A'):
             if cwe_number in CWE_INFO.keys():
                 return_lines.append(f'CWE: {value} - {CWE_INFO[cwe_number]}')
             else:
+                # Some CVE reports contain the following instead of nothing...
+                if value != 'NVD-CWE-Other' and value != 'NVD-CWE-noinfo':
+                    print(f'WARNING - \'{value}\' not found in CWE info, local cache might be out of date')
                 return_lines.append(f'CWE: {value}')
-                print(f'WARNING - {value} not found in CWE info, local cache might be out of date')
+
         else:
             return_lines.append(f'CWE: Missing CWE info (parsing error or absent data)')
     return return_lines
@@ -168,8 +184,15 @@ def parse_cvssMetricV40(metric):
 
     return return_lines
 
-
 def parse_cvssMetricV31(metric):
+    return_lines = [f'{SPACER}{INDENT}CVSS Metrics ({metric['cvssData']['version']}):']
+    return_lines.extend(add_indent(parse_source_info_for_CVSS(metric)))
+    return_lines.append(f'{INDENT}Base score: {metric["cvssData"]["baseScore"]}{SPACER}')
+    return_lines.append(f'{INDENT}Attack vector: {metric["cvssData"]["attackVector"]}{SPACER}')
+
+    return return_lines
+
+def parse_cvssMetricV30(metric):
     return_lines = [f'{SPACER}{INDENT}CVSS Metrics ({metric['cvssData']['version']}):']
     return_lines.extend(add_indent(parse_source_info_for_CVSS(metric)))
     return_lines.append(f'{INDENT}Base score: {metric["cvssData"]["baseScore"]}{SPACER}')
@@ -196,6 +219,9 @@ def parse_metrics(metrics, cve='N/A'):
     elif 'cvssMetricV31' in metrics.keys():
         metric_parser = parse_cvssMetricV31
         metric_type = metrics['cvssMetricV31']
+    elif 'cvssMetricV30' in metrics.keys():
+        metric_parser = parse_cvssMetricV30
+        metric_type = metrics['cvssMetricV30']
     elif 'cvssMetricV2' in metrics.keys():
         metric_parser = parse_cvssMetricV2
         metric_type = metrics['cvssMetricV2']
@@ -219,11 +245,11 @@ def parse_description(individual_cve):
             max_line_len = 100  # Max 100 chars
             new_line = ''
             for word in description['value'].split():
-                if len(new_line) + len(word) + 1 < max_line_len:
+                if len(new_line) + len(word) < max_line_len:
                     new_line += word + ' '
                 else:
                     return_lines.append(f'{INDENT}{new_line}{SPACER}')
-                    new_line = ''
+                    new_line = word
             if len(new_line) > 0:
                 return_lines.append(f'{INDENT}{new_line}{SPACER}')
 
@@ -237,11 +263,52 @@ def parse_tags(individual_cve):
             return_lines.append(f'Tags:{tag} {INDENT} Source: {tag_details["sourceIdentifier"]}{SPACER}')
     return return_lines
 
+def parse_configurations(individual_cve):
+    return_lines = []
+    app_lines = []
+    os_lines = []
+    hw_lines = []
+    configurations = individual_cve['configurations']
+    for items in configurations:
+        for nodes in items['nodes']:
+            for cpe_match in nodes['cpeMatch']:
+                parsed_cpe = parse_cpe(cpe_match['criteria'])
+                part = ''
+                part = 'APPLICATION' if parsed_cpe['part'] == CPE_PART_APPLICATION else part
+                part = 'OPERATING SYSTEM' if parsed_cpe['part'] == CPE_PART_OS else part
+                part = 'HARDWARE' if parsed_cpe['part'] == CPE_PART_HARDWARE else part
+
+                lines = None
+                if part == 'APPLICATION':
+                    lines = app_lines
+                elif part == 'OPERATING SYSTEM':
+                    lines = os_lines
+                elif part == 'HARDWARE':
+                    lines = hw_lines
+
+                lines.append(f'{part} - '
+                             f'Provider : {parsed_cpe['vendor']} - '
+                             f'System : {parsed_cpe['version']} - {SPACER}')
+
+    # We want to print in the following order: Application - Operating Systems - Hardware
+    return_lines.extend(app_lines)
+    return_lines.extend(os_lines)
+    return_lines.extend(hw_lines)
+
+    return return_lines
+
 def parse_individual_cve(individual_cve):
     return_lines = []
     cve = individual_cve['id']
-    id_line = f'{cve}{SPACER}'
-    return_lines.append(id_line)
+    return_lines.append(f'{cve}{SPACER}')
+
+    published_date = individual_cve['published']
+    return_lines.append(f'{INDENT}Published date : {published_date}{SPACER}')
+
+    modified_date = individual_cve['lastModified']
+    return_lines.append(f'{INDENT}Last modified date : {modified_date}{SPACER}')
+
+    return_lines.append(SPACER)
 
     return_lines.append(f'{INDENT}CVE Submitter information:{SPACER}')
     source_identifier = individual_cve['sourceIdentifier']
@@ -258,12 +325,12 @@ def parse_individual_cve(individual_cve):
     else:
         return_lines.append(f'{SPACER}{INDENT}Vulnerability tags: No tags infos for this CVE{SPACER}')
 
-    if 'configuration' in individual_cve.keys() and len(individual_cve['configuration']) > 0:
-        print('Got vulnerability configuration')
+    if 'configurations' in individual_cve.keys() and len(individual_cve['configurations']) > 0:
+        return_lines.append(f'{SPACER}')
+        return_lines.append(f'{INDENT}Vulnerable configuration:{SPACER}')
+        return_lines.extend(add_indent(parse_configurations(individual_cve), quantity=2))
     else:
         return_lines.append(f'{SPACER}{INDENT}Vulnerability configuration: No configuration infos for this CVE{SPACER}')
-
-    # TODO Impacted product information
 
     # CVE Description
     return_lines.append(f'{SPACER}')
