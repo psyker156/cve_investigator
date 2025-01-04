@@ -41,7 +41,7 @@ def fetch_command_line_arguments():
     parser.add_argument('-l', '--lastx',
                         help='Get cves for the last X hours',
                         type=int,
-                        default=None)
+                        default=18)
     parser.add_argument('-s', '--start',
                         help='From date',
                         default=None)
