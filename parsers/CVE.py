@@ -28,12 +28,10 @@ class CVE:
         cve_json = individual_cve
         if isinstance(individual_cve, str):
             cve_json = json.loads(individual_cve)
-        cve_data = individual_cve
 
-
-        # The data structure from NVD has "two" levels with an outer envelope containing just a 'cve' key.
-        # The actual data is in the inside envelope. By doing the operation bellow, we can support both
-        # data structures and make life easier, and prettier, for the calling code.
+        # The data structure from NVD has "tree" levels with an outer, a middle envelope containing just a 'cve' key.
+        # The actual data is inside the middle envelope. By doing the operation bellow, we can support both
+        # middle and inner data structures and make life easier, and prettier, for the calling code.
         if 'cve' in cve_json.keys():
             cve_json = cve_json['cve']
         cve_string = json.dumps(cve_json)

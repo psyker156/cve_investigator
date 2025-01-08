@@ -37,11 +37,11 @@ def fetch_command_line_arguments():
                         default='CVE')
     parser.add_argument('-y', '--yesterday',
                         help='Get yesterday\'s cves',
-                        default=False)
+                        default=True)
     parser.add_argument('-l', '--lastx',
                         help='Get cves for the last X hours',
                         type=int,
-                        default=18)
+                        default=None)
     parser.add_argument('-s', '--start',
                         help='From date',
                         default=None)
