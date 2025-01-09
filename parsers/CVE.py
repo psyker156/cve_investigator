@@ -6,6 +6,12 @@ Copyright (C) 2025  Philippe Godbout
 import json
 from types import SimpleNamespace
 
+MANDATORY_CVE_FIELDS = ["id",
+                        "published",
+                        "lastModified",
+                        "references",
+                        "descriptions"]
+
 class CVE:
     """
     This class represents a single Vulnerability presented as a python object.
@@ -34,5 +40,24 @@ class CVE:
         # middle and inner data structures and make life easier, and prettier, for the calling code.
         if 'cve' in cve_json.keys():
             cve_json = cve_json['cve']
+
+        if not self.is_cve_valid(cve_json):
+            raise ValueError('ERROR - CVE missing required field')
+
         cve_string = json.dumps(cve_json)
         self.infos = json.loads(cve_string, object_hook=lambda d: SimpleNamespace(**d))
+
+    def is_cve_valid(self, cve):
+        """
+        This simply validates that the cve contains all the required fields
+        :param cve: A JSON parsed API response.
+        :return: Boolean True if valid false otherwise.
+        """
+        return_value = True
+        keys = cve.keys()
+
+        for mandatory_field in MANDATORY_CVE_FIELDS:
+            if mandatory_field not in keys:
+                return_value = False
+                break
+        return return_value
