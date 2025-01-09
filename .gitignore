@@ -78,6 +78,7 @@ fabric.properties
 
 #NIST API key file
 key.txt
+Network/key.txt
 
 #Debug file
 data.json
