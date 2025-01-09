@@ -16,8 +16,15 @@ class CVSSMetricV40:
     The reason for this class to exist is to avoid users having to deal directly with raw CVE data.
     This class conforms to the CVE API Schema: https://csrc.nist.gov/schema/nvd/api/2.0/cve_api_json_2.0.schema
     """
-
     infos = None
+    source = None
+    type = None
+    version = None
+    base_score = None
+    attack_vector = None
+    exploit_maturity = None
+    vulnerability_response_effort = None
+    provider_urgency = None
 
     def __init__(self, individual_cvss):
         """
@@ -40,8 +47,10 @@ class CVSSMetricV40:
             raise ValueError('ERROR - CVSS missing required field')
 
         cvss_string = json.dumps(cvss_json)
-
         self.infos = json.loads(cvss_string, object_hook=lambda d: SimpleNamespace(**d))
+        self.type = cvss_json['type']
+        self.source = cvss_json['source']
+        self.parse_inner_cvss(cvss_json['cvssData'])
 
     def is_cvss_valid(self, cvss):
         """
@@ -58,3 +67,21 @@ class CVSSMetricV40:
                 break
 
         return return_value
+
+    def parse_inner_cvss(self, cvss):
+        """
+        This simply parses the inner fields that we want to keep
+        :param cvss: json object of the CVSS
+        """
+        if 'version' in cvss.keys():
+            self.version = cvss['version']
+        if 'baseScore' in cvss.keys():
+            self.base_score = cvss['baseScore']
+        if 'attackVector' in cvss.keys():
+            self.attack_vector = cvss['attackVector']
+        if 'exploitMaturity' in cvss.keys():
+            self.exploit_maturity = cvss['exploitMaturity']
+        if 'vulnerabilityResponseEffort' in cvss.keys():
+            self.vulnerability_response_effort = cvss['vulnerabilityResponseEffort']
+        if 'providerUrgency' in cvss.keys():
+            self.provider_urgency = cvss['providerUrgency']

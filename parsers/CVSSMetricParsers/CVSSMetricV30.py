@@ -18,6 +18,11 @@ class CVSSMetricV30:
     """
 
     infos = None
+    source = None
+    type = None
+    version = None
+    base_score = None
+    attack_vector = None
 
     def __init__(self, individual_cvss):
         """
@@ -43,6 +48,9 @@ class CVSSMetricV30:
 
         cvss_string = json.dumps(cvss_json)
         self.infos = json.loads(cvss_string, object_hook=lambda d: SimpleNamespace(**d))
+        self.type = cvss_json['type']
+        self.source = cvss_json['source']
+        self.parse_inner_cvss(cvss_json['cvssData'])
 
     def is_cvss_valid(self, cvss):
         """
@@ -59,3 +67,15 @@ class CVSSMetricV30:
                 break
 
         return return_value
+
+    def parse_inner_cvss(self, cvss):
+        """
+        This simply parses the inner fields that we want to keep
+        :param cvss: json object of the CVSS
+        """
+        if 'version' in cvss.keys():
+            self.version = cvss['version']
+        if 'baseScore' in cvss.keys():
+            self.base_score = cvss['baseScore']
+        if 'attackVector' in cvss.keys():
+            self.attack_vector = cvss['attackVector']
