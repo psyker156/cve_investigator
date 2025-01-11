@@ -1,7 +1,13 @@
+"""
+This file is part of the VulnerabilityManager project, a tool aimed at managing vulnerabilities
+Copyright (C) 2025  Philippe Godbout
+"""
+
 import json
 import requests
 import time
 
+from NetworkServices.CallUrlBasedRestAPI import call_url_based_rest_api
 
 # The following are all constants used to locate data on the local hard drive
 API_KEY_LOCATION = 'key.txt'
@@ -20,16 +26,8 @@ def call_nist_api(use_api_key, url):
         api_key = None
 
     if api_key is not None:
-        response = requests.get(url, headers={'apiKey': api_key})
+        response = call_url_based_rest_api(url, headers={'apiKey': api_key})
     else:
-        response = requests.get(url)
+        response = call_url_based_rest_api(url)
 
-    # Just an effort to not blast out the API
-    time.sleep(2)
-    if response.status_code != 200:
-        raise ConnectionError(f'ERROR - http error code {response.status_code} bailing out')
-    return json.loads(response.text)
-
-if __name__ == '__main__':
-    pass
-
+    return json.loads(response)

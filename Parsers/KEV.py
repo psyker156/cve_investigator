@@ -3,8 +3,7 @@ This file is part of the VulnerabilityManager project, a tool aimed at managing 
 Copyright (C) 2025  Philippe Godbout
 """
 
-from NetworkServices.NISTAPIServices import call_source_api
-from Writers.FileWriter import write_to_file
+#TODO import the CISA stuff
 
 # NISTDataSource makes use of the NIST APIs, the full documentation to these can be found at the address bellow
 # https://nvd.nist.gov/developers/data-sources
@@ -60,7 +59,9 @@ class SourceIdentifier:
         return {'id': id, 'name': name, 'created': created, 'emails': emails}
 
     def update_datasource_local_cache(self, use_api_key=False):
-        data = call_source_api(use_api_key)
+        request_string = ''
+        request_string += NIST_DATA_SOURCE_API_URL
+        data = NISTApiCall.call_nist_api(use_api_key, request_string)
 
         sources = data['sources']
         parsed_sources = []
@@ -73,7 +74,9 @@ class SourceIdentifier:
                          f'{parsed_source['emails']}')
             parsed_sources.append(data_line)
 
-        write_to_file(DATA_SOURCE_LOCAL_CACHE_LOCATION, parsed_sources, append_nl=True)
+        with open(DATA_SOURCE_LOCAL_CACHE_LOCATION, 'w', encoding='utf-8') as f:
+            for source in parsed_sources:
+                f.write(source + '\n')
 
     def fetch_data_source_data(self):
         with open(DATA_SOURCE_LOCAL_CACHE_LOCATION, 'r', encoding='utf-8') as f:

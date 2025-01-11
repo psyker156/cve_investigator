@@ -14,7 +14,7 @@ def write_to_file(filename, data, append_nl=False):
     if isinstance(data, str):
         data = [data]
 
-    with open(filename, 'w') as f:
+    with open(filename, 'w', encoding='utf-8') as f:
         for line in data:
             if append_nl:
                 line += '\n'

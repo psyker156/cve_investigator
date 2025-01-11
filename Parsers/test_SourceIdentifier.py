@@ -26,7 +26,7 @@ class TestSourceIdentifier(unittest.TestCase):
         """
         si = SourceIdentifier.SourceIdentifier(use_api_key=True, networked=True)
         r = si.get_source_identifier('8254265b-2729-46b6-b9e3-3dfca2d5bfca')
-        self.assertEqual('MITRE',r['name'])
+        self.assertEqual('MITRE', r['name'])
 
         r = si.get_source_identifier('RogerRabbit')
         self.assertEqual(None, None)
@@ -37,7 +37,7 @@ class TestSourceIdentifier(unittest.TestCase):
         """
         si = SourceIdentifier.SourceIdentifier(use_api_key=False, networked=True)
         r = si.get_source_identifier('8254265b-2729-46b6-b9e3-3dfca2d5bfca')
-        self.assertEqual('MITRE',r['name'])
+        self.assertEqual('MITRE', r['name'])
 
         r = si.get_source_identifier('RogerRabbit')
         self.assertEqual(None, None)
