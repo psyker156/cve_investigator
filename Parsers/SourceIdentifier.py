@@ -24,14 +24,21 @@ class SourceIdentifier:
     infos = None
     data_source = None
 
-    def __init__(self, use_api_key=False):
+    def __init__(self, use_api_key=False, networked=False):
         """
         The constructor for SourceIdentifier.
         """
-        self.update_datasource_local_cache(use_api_key)
+        if networked:
+            self.update_datasource_local_cache(use_api_key)
         self.fetch_data_source_data()
 
     def get_source_identifier(self, data_source_string):
+        """
+        This is the method that the end user needs to call to get the data source identifier informations
+        :param data_source_string: string, a UUID style identifier for a specific data source.
+        :return: dict, {'name': name, 'date_first_submission': date_first_submission, 'contact_mail': contact_mail}
+                 None if information is not available
+        """
         return_value = None
         if data_source_string in self.data_source.keys():
             return_value = self.data_source[data_source_string]
@@ -55,8 +62,6 @@ class SourceIdentifier:
         request_string = ''
         request_string += NIST_DATA_SOURCE_API_URL
         data = Network.NISTApiCall.call_nist_api(use_api_key, request_string)
-
-        print(f'Data source contains {data['totalResults']} sources')
 
         sources = data['sources']
         parsed_sources = []
