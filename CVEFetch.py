@@ -143,9 +143,15 @@ def parse_source_identifier(source_identifier, cve='N/A'):
 
     data_source_name_line = f'Submitter: {source_data['name']}{SPACER}'
     return_lines.append(data_source_name_line)
-    data_source_first_date_line = f'Submitter active since: {source_data["date_first_submission"]}{SPACER}'
+    try:
+        data_source_first_date_line = f'Submitter active since: {source_data["date_first_submission"]}{SPACER}'
+    except:
+        data_source_first_date_line = ""
     return_lines.append(data_source_first_date_line)
-    data_source_contact_info = f'Submitter contact info: {source_data["contact_mail"]}{SPACER}'
+    try:
+        data_source_contact_info = f'Submitter contact info: {source_data["contact_mail"]}{SPACER}'
+    except:
+        data_source_contact_info = ""
     return_lines.append(data_source_contact_info)
 
     return return_lines

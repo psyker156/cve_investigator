@@ -17,8 +17,7 @@ CPE_MATCH_API_URL = 'https://services.nvd.nist.gov/rest/json/cpematch/2.0'
 
 
 def call_cve_api(params, index=0):
-    request_string = CVE_API_URL
-    request_string += 'startIndex=' + str(index) + '&'
+    request_string = CVE_API_URL + '?' + 'startIndex=' + str(index) + '&'
     if params.start is not None and not params.yesterday:
         request_string += 'pubStartDate=' + params.start + 'T00:00:00.000' + '&'
     if params.end is not None and not params.yesterday:
@@ -38,6 +37,10 @@ def call_cve_api(params, index=0):
     request_string += '' if params.cve is None else 'cveId=' + params.cve + '&'
 
     return call_nist_api(params.nistapikey, request_string)
+
+def call_cve_history_api(cve, use_api_key=False, index=0):
+    request_string = CVE_API_URL + '?' + 'cveId=' + cve
+    return call_nist_api(use_api_key, request_string)
 
 def call_source_api(use_api_key=False):
     data = call_nist_api(use_api_key, DATA_SOURCES_API_URL)
