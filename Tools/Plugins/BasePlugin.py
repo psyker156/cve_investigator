@@ -7,23 +7,32 @@ class BasePlugin(object):
     """
     This class is the parent class for all plugins. A valid plugin MUST inherit from BasePlugin.
     """
-    type = 'Base'   # The plugin type is used to group plugins by type, the base plugin is just an example.
-    identity = 'DisplayNameOfThePlugin'
-    description = 'A string giving a simple description of the plugin'
+
+    # This first part is the plugin help menu, this must be set
+    _help_string = ''
+
+    # This is general plugin book keeping
+    _type = 'Base'   # The plugin type is used to group plugins by type, the base plugin is just an example.
+    _identity = 'DisplayNameOfThePlugin'
+    _description = 'A string giving a simple description of the plugin'
 
 
-    #This part contains general configuration
-    valid_plugin_types = ['command',
-                          'writer']
-    plugin_error_messages = {-1: "Run is not implemented"}
-    identity_max_len = 15
-    description_max_len = 60
+    # This part contains general configuration
+    _valid_plugin_types = ['command',
+                           'writer']
+    RUN_SUCCESS = 0
+    RUN_NOT_IMPLEMENTED = -1000
+
+    _plugin_error_messages = {RUN_NOT_IMPLEMENTED: "Run is not implemented"}
+    _identity_max_len = 15
+    _description_max_len = 60
+
 
     def __init__(self):
         pass
 
     def plugin_type(self):
-        return self.type
+        return self._type
 
     def set_plugin_type(self, plugin_type):
         """
@@ -33,24 +42,24 @@ class BasePlugin(object):
         :param plugin_type: string, the plugin type to be used
         :return:
         """
-        if plugin_type not in self.valid_plugin_types:
+        if plugin_type not in self._valid_plugin_types:
             raise Exception(f'Invalid plugin type {plugin_type}\n')
-        self.type = plugin_type
+        self._type = plugin_type
 
     def plugin_identity(self):
-        return self.identity
+        return self._identity
 
     def set_plugin_identity(self, plugin_identity):
         """
         This will set the plugin identity. In order to keep things clean, only 15 chars are allowed
         :param plugin_identity: string, the plugin display name
         """
-        if len(plugin_identity) > self.identity_max_len:
+        if len(plugin_identity) > self._identity_max_len:
             raise Exception(f'Invalid plugin identity length {len(plugin_identity)} for plugin {plugin_identity}\n')
-        self.identity = plugin_identity
+        self._identity = plugin_identity
 
     def plugin_description(self):
-        return self.description
+        return self._description
 
     def set_plugin_description(self, plugin_description):
         """
@@ -58,9 +67,9 @@ class BasePlugin(object):
         command line to get general information about the plugin. The current max length is 60 chars.
         :param plugin_description:
         """
-        if len(plugin_description) > self.description_max_len:
+        if len(plugin_description) > self._description_max_len:
             raise Exception(f'Invalid plugin description length {len(plugin_description)} for plugin {plugin_description}\n')
-        self.description = plugin_description
+        self._description = plugin_description
 
     def register_error_code(self, code, message):
         """
@@ -68,11 +77,11 @@ class BasePlugin(object):
         :param code: integer, the error code must be unique within a plugin
         :param message: string, the error message, cannot exceed 60 chars
         """
-        if code in self.plugin_error_messages.keys():
+        if code in self._plugin_error_messages.keys():
             raise Exception(f'Can\'t register error code {code}, already registered\n')
-        if len(message) > self.description_max_len:
+        if len(message) > self._description_max_len:
             raise Exception(f'Error message length is too long {len(message)}\n')
-        self.plugin_error_messages[code] = message
+        self._plugin_error_messages[code] = message
 
     def error_message(self, code):
         """
@@ -80,9 +89,25 @@ class BasePlugin(object):
         :param code: integer, the error code to lookup
         :return: string, the error message for the given error code
         """
-        if code not in self.plugin_error_messages.keys():
+        if code not in self._plugin_error_messages.keys():
             raise Exception(f'Can\'t find error code {code} in plugin {self.plugin_identity()}\n')
-        return self.plugin_error_messages[code]
+        return self._plugin_error_messages[code]
+
+    def help(self):
+        """
+        This is called to access the help for a given plugin. All the user facing documentation is returned.
+        :return: string, a formated string of help text
+        """
+        return self._help_string
+
+    def set_help(self, new_help_string):
+        """
+        This is used to set the help string. Properly formating the help string is the plugin responsibility.
+        :param new_help_string: string, a formated string of help text
+        """
+        if _type(new_help_string) != str:
+            raise Exception(f'Invalid help string {_type(new_help_string)}, must be string\n')
+        self._help_string = new_help_string
 
     def run(self, params):
         """
@@ -93,4 +118,4 @@ class BasePlugin(object):
         :return: All plugins MUST return 0 in case of success.
         """
         print(params)
-        return -1
+        return self.RUN_NOT_IMPLEMENTED
