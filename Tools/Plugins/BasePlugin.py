@@ -3,15 +3,20 @@ This file is part of the VulnerabilityManager project, a tool aimed at managing 
 Copyright (C) 2025  Philippe Godbout
 """
 
+
+
 class BasePlugin(object):
     """
     This class is the parent class for all plugins. A valid plugin MUST inherit from BasePlugin.
     """
 
+    ITERATION = 1   # This number is to be incremented each time base plugin mandatory
+                    # implementation changes.
+
     # This first part is the plugin help menu, this must be set
     _help_string = ''
 
-    # This is general plugin book keeping
+    # This is general plugin bookkeeping
     _type = 'Base'   # The plugin type is used to group plugins by type, the base plugin is just an example.
     _identity = 'DisplayNameOfThePlugin'
     _description = 'A string giving a simple description of the plugin'
@@ -31,8 +36,10 @@ class BasePlugin(object):
     def __init__(self):
         pass
 
+
     def plugin_type(self):
         return self._type
+
 
     def set_plugin_type(self, plugin_type):
         """
@@ -46,8 +53,10 @@ class BasePlugin(object):
             raise Exception(f'Invalid plugin type {plugin_type}\n')
         self._type = plugin_type
 
+
     def plugin_identity(self):
         return self._identity
+
 
     def set_plugin_identity(self, plugin_identity):
         """
@@ -58,8 +67,10 @@ class BasePlugin(object):
             raise Exception(f'Invalid plugin identity length {len(plugin_identity)} for plugin {plugin_identity}\n')
         self._identity = plugin_identity
 
+
     def plugin_description(self):
         return self._description
+
 
     def set_plugin_description(self, plugin_description):
         """
@@ -70,6 +81,7 @@ class BasePlugin(object):
         if len(plugin_description) > self._description_max_len:
             raise Exception(f'Invalid plugin description length {len(plugin_description)} for plugin {plugin_description}\n')
         self._description = plugin_description
+
 
     def register_error_code(self, code, message):
         """
@@ -83,6 +95,7 @@ class BasePlugin(object):
             raise Exception(f'Error message length is too long {len(message)}\n')
         self._plugin_error_messages[code] = message
 
+
     def error_message(self, code):
         """
         This is to be called following run if run did not return 0, it will return the error message for the code.
@@ -93,6 +106,7 @@ class BasePlugin(object):
             raise Exception(f'Can\'t find error code {code} in plugin {self.plugin_identity()}\n')
         return self._plugin_error_messages[code]
 
+
     def help(self):
         """
         This is called to access the help for a given plugin. All the user facing documentation is returned.
@@ -100,16 +114,43 @@ class BasePlugin(object):
         """
         return self._help_string
 
+
     def set_help(self, new_help_string):
         """
         This is used to set the help string. Properly formating the help string is the plugin responsibility.
         :param new_help_string: string, a formated string of help text
         """
-        if _type(new_help_string) != str:
-            raise Exception(f'Invalid help string {_type(new_help_string)}, must be string\n')
+        if type(new_help_string) != str:
+            raise Exception(f'Invalid help string {type(new_help_string)}, must be string\n')
         self._help_string = new_help_string
 
-    def run(self, params):
+
+    def self_validate(self):
+        """
+        This method makes sure that the kid plugin matches the base plugin!
+        """
+        if BasePlugin.ITERATION != self.ITERATION:
+            raise EnvironmentError('Plugin iteration does not match base plugin iteration\n')
+
+        if BasePlugin.run == self.run:
+            raise EnvironmentError('Plugin run is not implemented\n')
+
+        if BasePlugin._identity == self._identity:
+            raise EnvironmentError('Plugin identity is not set\n')
+
+        if BasePlugin._description == self._description:
+            raise EnvironmentError('Plugin identity is not set\n')
+
+        if BasePlugin._type == self._type:
+            raise EnvironmentError('Plugin type is not set\n')
+
+        if BasePlugin._help_string == self._help_string:
+            raise EnvironmentError('Plugin help is not set\n')
+
+        print(f'Plugin \'{self.plugin_identity()}\' is valid and ready to be used.\n')
+
+
+    def run(self, params=None):
         """
         This method will be called when the plugin is executed. All plugins MUST return 0 in case of success.
         Any other value need to be mapped to the plugin_error_messages dictionary so that the calling code

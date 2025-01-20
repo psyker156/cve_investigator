@@ -6,7 +6,7 @@ Copyright (C) 2025  Philippe Godbout
 from Tools.configuration import *
 
 class Console:
-    def __init__(self, cve):
+    def __init__(self):
         self.print_welcome()
 
     def print_welcome(self):
