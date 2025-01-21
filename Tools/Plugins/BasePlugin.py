@@ -135,6 +135,9 @@ class BasePlugin(object):
         if BasePlugin.run == self.run:
             raise EnvironmentError('Plugin run is not implemented\n')
 
+        if BasePlugin.validate_command == self.validate_command:
+            raise EnvironmentError('Plugin validate_command() is not implemented\n')
+
         if BasePlugin._identity == self._identity:
             raise EnvironmentError('Plugin identity is not set\n')
 
@@ -148,6 +151,16 @@ class BasePlugin(object):
             raise EnvironmentError('Plugin help is not set\n')
 
         print(f'Plugin \'{self.plugin_identity()}\' is valid and ready to be used.\n')
+
+
+    def validate_command(self, args):
+        """
+        This is a localized command parser that every plugin must implement.
+        :param args: a list of commands including the command name
+        :return: boolean, True if the command is valid, False otherwise
+        """
+        pass
+        return True
 
 
     def run(self, params=None):

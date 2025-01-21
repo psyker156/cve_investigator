@@ -49,19 +49,26 @@ class PluginManager(object):
         """
         sys.path.insert(0, PLUGINS_DIRECTORY)        # This allows the interpreter to find our plugins dir
 
-        for filename in os.listdir(PLUGINS_DIRECTORY):
+        dir_listing = os.listdir(PLUGINS_DIRECTORY)
+
+        if '__pycache__' in dir_listing:
+            dir_listing.remove('__pycache__')
+
+        print(f'Loading {len(dir_listing)} plugins from {PLUGINS_DIRECTORY}')
+
+        for filename in dir_listing:
             if filename.endswith('.py'):
                 self.load_plugin(filename[:-3])             # This has to be a module name, not a file name!
 
         sys.path.remove(PLUGINS_DIRECTORY)                  # Once no longer required we remove it!
 
 
-    def load_plugin(self, plugin_file_name):
+    def load_plugin(self, plugin_name):
         """
         This will load a plugin file. After being loaded, the plugin will be available from the plugins dictionary
-        :param plugin_file_name: string, the name of the plugin file needing to be loaded
+        :param plugin_name: string, the name of the plugin file needing to be loaded
         """
-        module = importlib.import_module(plugin_file_name)
+        module = importlib.import_module(plugin_name)
 
         # A module main class need to bear the same name as the module name
         if not hasattr(module, module.__name__):
@@ -76,7 +83,11 @@ class PluginManager(object):
 
 
     def unload_plugin(self, plugin_name):
-        pass    # TODO
+        """
+        This will remove a loaded plugin, following the plugin removal, it will not be available to be called
+        :param plugin_name: string, the plugin identity
+        """
+        del self.plugins[plugin_name]
 
 
     def validate_plugin(self, plugin_name):

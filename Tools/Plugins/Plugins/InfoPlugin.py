@@ -33,6 +33,20 @@ class InfoPlugin(BasePlugin.BasePlugin):
         self.register_error_code(self.INVALID_ARGUMENT_ERROR, self.INVALID_ARGUMENT_MESSAGE)
 
 
+    def validate_command(self, args):
+        """
+        This is a localized command parser that every plugin must implement.
+        :param args: a list of commands including the command name
+        :return: boolean, True if the command is valid, False otherwise
+        """
+        return_value = True
+
+        # Info requires a single parameter with its own name
+        if len(args) != 1 or args[0] != self.plugin_identity():
+            return_value = False
+
+        return return_value
+
     def run(self, params=None):
         """
         This will simply display general information about cve_investigator. It "kinda" is the
@@ -41,9 +55,9 @@ class InfoPlugin(BasePlugin.BasePlugin):
         :return: 0 if properly called, self.INVALID_ARGUMENT_ERROR if wrongly called
         """
         return_value = self.INVALID_ARGUMENT_ERROR
-        if params is None or len(params) == 0:
-            return_value = self.RUN_SUCCESS
+        if self.validate_command(params):
             self._execute()
+            return_value = self.RUN_SUCCESS
         return return_value
 
 
