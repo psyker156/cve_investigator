@@ -4,6 +4,7 @@ Copyright (C) 2025  Philippe Godbout
 """
 
 from Tools.Plugins.PluginManager import PluginManager
+from Tools.Plugins.BasePlugin import BasePlugin
 
 class Console:
 
@@ -19,7 +20,7 @@ class Console:
 
     def run_console(self):
         print('Console is running...')
-
+        #import pdb; pdb.set_trace()
         while True:
             # Get the command
             command = self.acquire_command()
@@ -34,11 +35,9 @@ class Console:
                 self.invalid_command(command_name)
                 continue
 
-            if not self.pm.plugins[command_name].validate_command(parsed_command):
-                self.invalid_command(command_name)
-                continue
-
-            self.pm.plugins[command_name].run(parsed_command)
+            result = self.pm.plugins[command_name].run(parsed_command)
+            if result != BasePlugin.RUN_SUCCESS:
+                print(self.pm.plugins[command_name].error_message(result))
 
         print('')
         print('Closing Console...')

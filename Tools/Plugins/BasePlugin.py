@@ -28,13 +28,12 @@ class BasePlugin(object):
     RUN_SUCCESS = 0
     RUN_NOT_IMPLEMENTED = -1000
 
-    _plugin_error_messages = {RUN_NOT_IMPLEMENTED: "Run is not implemented"}
     _identity_max_len = 15
     _description_max_len = 60
 
 
     def __init__(self):
-        pass
+        self._plugin_error_messages = {BasePlugin.RUN_NOT_IMPLEMENTED: "Run is not implemented"}
 
 
     def plugin_type(self):

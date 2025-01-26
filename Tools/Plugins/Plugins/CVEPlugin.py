@@ -2,23 +2,29 @@
 This file is part of the VulnerabilityManager project, a tool aimed at managing vulnerabilities
 Copyright (C) 2025  Philippe Godbout
 """
+import re
+
 from Tools.configuration import *
 
 import Tools.Plugins.BasePlugin as BasePlugin
 
-class InfoPlugin(BasePlugin.BasePlugin):
+class CVEPlugin(BasePlugin.BasePlugin):
     """
     This plugin simply displays general information about cve_investigator
     """
     ITERATION = 1
 
-    INFO_HELP_STRING = ('Info does not have any argument and must be called like:\n'
-                        '# info\n'
-                        'After calling, the current information about cve_investigator will be displayed\n')
+    INFO_HELP_STRING = ('CVE has mainly 3 modes of execution:\n'
+                        '# cve CVE-XXXX-XXXX - Prints a summary of a given CVE if available\n'
+                        '# cve CVE-XXXX-XXXX verbose - Prints a long version of the CVE information\n'
+                        '# cve CVE-XXXX-XXXX AnyCVEParameter- Prints the data for a given CVE part\n'
+                        '\t valid inputs are as documented in the CVE 2.0 API documentation')
 
 
     INVALID_ARGUMENT_ERROR = -1
-    INVALID_ARGUMENT_MESSAGE = "Info must be called without any arguments"
+    INVALID_ARGUMENT_MESSAGE = "cve must be call with at least a CVE number"
+
+    CVE_REGEX = r"^CVE-\d{4}-\d{4,}$"
 
 
     def __init__(self):
@@ -27,8 +33,8 @@ class InfoPlugin(BasePlugin.BasePlugin):
         """
         super().__init__()
         self.set_plugin_type('command')
-        self.set_plugin_identity('info')
-        self.set_plugin_description('Displays general information about cve_investigator')
+        self.set_plugin_identity('cve')
+        self.set_plugin_description('Allows CVE inspection based on a CVE number')
         self.set_help(self.INFO_HELP_STRING)
         self.register_error_code(self.INVALID_ARGUMENT_ERROR, self.INVALID_ARGUMENT_MESSAGE)
 
@@ -39,14 +45,14 @@ class InfoPlugin(BasePlugin.BasePlugin):
         :param args: a list of commands including the command name
         :return: boolean, True if the command is valid, False otherwise
         """
-        return_value = True
+        # CVE requires at least two parameters the first one being the name
+        if len(args) < 2 or args[0] != self.plugin_identity():
+            return False
 
-        # Info requires a single parameter with its own name
-        if len(args) != 1 or args[0] != self.plugin_identity():
-            print()
-            return_value = False
+        # Let's validate the CVE number is valid before we try to use it
+        cve_number = args[1]
+        return bool(re.match(self.CVE_REGEX, cve_number))
 
-        return return_value
 
     def run(self, params=None):
         """
@@ -57,7 +63,7 @@ class InfoPlugin(BasePlugin.BasePlugin):
         """
         return_value = self.INVALID_ARGUMENT_ERROR
         if self.validate_command(params):
-            self._execute()
+            # self._execute()
             return_value = self.RUN_SUCCESS
         return return_value
 
