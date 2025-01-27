@@ -6,7 +6,7 @@ Copyright (C) 2025  Philippe Godbout
 import requests
 import time
 
-def call_url_based_rest_api(url, headers=None, safe=True):
+def call_url_based_rest_api(url, headers=None, safe=False):
     # Just an effort to not blast out the APIs
     if safe:
         time.sleep(2)

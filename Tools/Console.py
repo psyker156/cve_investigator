@@ -11,16 +11,13 @@ class Console:
     builtins_command = {'exit': 'Running this will terminate cve_investigator',
                         'help': 'Running this will display all available commands'}
 
-    pm = None
-    context = ''
-
     def __init__(self, plugin_manager: PluginManager):
         self.pm = plugin_manager
+        self.context = ''
 
 
     def run_console(self):
         print('Console is running...')
-        #import pdb; pdb.set_trace()
         while True:
             # Get the command
             command = self.acquire_command()

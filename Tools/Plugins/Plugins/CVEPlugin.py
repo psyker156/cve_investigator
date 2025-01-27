@@ -3,10 +3,14 @@ This file is part of the VulnerabilityManager project, a tool aimed at managing 
 Copyright (C) 2025  Philippe Godbout
 """
 import re
+import textwrap
 
+from NetworkServices.NISTAPIServices import call_cve_api
+from Parsers.CVE import CVE
 from Tools.configuration import *
 
 import Tools.Plugins.BasePlugin as BasePlugin
+
 
 class CVEPlugin(BasePlugin.BasePlugin):
     """
@@ -24,7 +28,9 @@ class CVEPlugin(BasePlugin.BasePlugin):
     INVALID_ARGUMENT_ERROR = -1
     INVALID_ARGUMENT_MESSAGE = "cve must be call with at least a CVE number"
 
-    CVE_REGEX = r"^CVE-\d{4}-\d{4,}$"
+    CVE_REGEX = r"(?i)^cve-\d{4}-\d{4,}$"
+
+    LOCAL_CACHE = {}
 
 
     def __init__(self):
@@ -63,17 +69,47 @@ class CVEPlugin(BasePlugin.BasePlugin):
         """
         return_value = self.INVALID_ARGUMENT_ERROR
         if self.validate_command(params):
-            # self._execute()
+            cve = params[1].upper()
+            other_params = None
+
+            if len(params) > 2:
+                other_params = params[2:]
+
+            self._execute(cve, params)
             return_value = self.RUN_SUCCESS
         return return_value
 
 
-    def _execute(self):
+    def _execute(self, cve, params=None):
         """
         This is called by run and should never be called directly!!!!
         """
-        print(f'CVE Investogator version {CVE_INVESTIGATOR_VERSION} Community Edition')
-        print(f'Release Date: {CVE_INVESTIGATOR_RELEASE_DATE}')
-        print(f'Provided by {CVE_INVESTIGATOR_WEBSITE_URL}')
-        print(f'Latest version available at: {CVE_INVESTIGATOR_SOURCE_URL}')
-        print(f'{CVE_INVESTIGATOR_COPYRIGHT}')
+        if cve not in self.LOCAL_CACHE:
+            print(f'Searching NVD for {cve}...')
+            r = call_cve_api(cve=cve)
+
+            if not 'vulnerabilities' in r:
+                raise Exception(f'No vulnerabilities found in {cve} NVD records')
+            self.LOCAL_CACHE[cve] = r['vulnerabilities'][0]
+            print(f'{cve} was added to local cache from NVD')
+        else:
+            print(f'Loading {cve} from local cache\n')
+
+        usable_cve = CVE(self.LOCAL_CACHE[cve])
+        print(f'CVE identifier: {usable_cve.infos.id}')
+        print(f'\tPublished on:{usable_cve.infos.published}')
+        print(f'\tLast modified on:{usable_cve.infos.lastModified}')
+
+        print(f'\tDescription(s):')
+        for d in usable_cve.infos.descriptions:
+            print(f'\t{d.lang}')
+            print(self._format_text(d.value))
+
+    def _format_text(self, text):
+        end_result = ''
+        wrapped_text = textwrap.wrap(text, width=70)
+        for d in wrapped_text:
+            end_result += f'\t{d}\n'
+        return end_result
+
+

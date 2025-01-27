@@ -19,8 +19,6 @@ class CVE:
     This class conforms to the CVE API Schema: https://csrc.nist.gov/schema/nvd/api/2.0/cve_api_json_2.0.schema
     """
 
-    infos = None
-
     def __init__(self, individual_cve):
         """
         The constructor for CVE. Following this being called, the CVE is fully populated and no additional
@@ -29,6 +27,7 @@ class CVE:
                                The parameter can either be a string or a json object.
                                https://docs.python.org/3/library/json.html
         """
+        self.infos = None
         # We want to be able to call the same constructor with either a string or json
         # The code bellow is what allows for this.
         cve_json = individual_cve
