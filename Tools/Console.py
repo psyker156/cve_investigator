@@ -9,11 +9,15 @@ from Tools.Plugins.BasePlugin import BasePlugin
 class Console:
 
     builtins_command = {'exit': 'Running this will terminate cve_investigator',
-                        'help': 'Running this will display all available commands'}
+                        'help': 'Running this will display all available commands',
+                        'set_context': 'Run #context prefix suffix to add these to your commands',
+                        'unset_context': 'Removes a previously set context'}
 
     def __init__(self, plugin_manager: PluginManager):
         self.pm = plugin_manager
-        self.context = ''
+        self.context_prefix = ''
+        self.context_suffix = ''
+        self.context = self.context_prefix + ' ' + self.context_suffix
 
 
     def run_console(self):
@@ -21,7 +25,9 @@ class Console:
         while True:
             # Get the command
             command = self.acquire_command()
-            parsed_command = self.parse_command(command)
+            parsed_command = [command]
+            if command != 'unset_context':      # unset_context needs a special treatment... TODO review this
+                parsed_command = self.parse_command(command)
             command_name = parsed_command[0]
 
             if self.run_built_in_commands(parsed_command):
@@ -44,7 +50,10 @@ class Console:
         return input(f'{self.context}# ')
 
     def parse_command(self, command):
-        return command.split()
+        parsed = command.split()
+        if len(self.context_prefix) > 0:
+            parsed = [self.context_prefix] + parsed + [self.context_suffix]
+        return parsed
 
     def invalid_command(self, command_name):
         print(f'Command not found: {command_name}')
@@ -70,19 +79,38 @@ class Console:
     # EVERYTHING THAT FOLLOWS IS FOR BUILT-IN COMMANDS IMPLEMENTATION
     #
     def help(self, params):
-        print('Available commands:')
-        print('\tBuilt-in commands:')
-        for command in self.builtins_command.keys():
-            print(f'\t\t{command} : {self.builtins_command[command]}')
-        print()
-        print('\tPlugins commands:')
-        for command in self.pm.plugins.keys():
-            print(f'\t\t{command} : {self.pm.plugins[command].plugin_description()}')
-        print()
+        if len(params) == 1:
+            print('Available commands:')
+            print('\tBuilt-in commands:')
+            for command in self.builtins_command.keys():
+                print(f'\t\t{command} : {self.builtins_command[command]}')
+            print()
+            print('\tPlugins commands:')
+            for command in self.pm.plugins.keys():
+                print(f'\t\t{command} : {self.pm.plugins[command].plugin_description()}')
+            print()
+        elif len(params) == 2:
+            help_for = params[1]
+            if help_for in self.pm.plugins.keys():
+                print(self.pm.plugins[help_for].INFO_HELP_STRING)
+            else:
+                print(f'Command not found: {help_for}')
 
 
     def exit(self, params):
         quit()
+
+
+    def set_context(self, params):
+        self.context_prefix = params[1]
+        self.context_suffix = params[2]
+        self.context = self.context_prefix + ' ' + self.context_suffix
+
+
+    def unset_context(self, params):
+        self.context_prefix = ''
+        self.context_suffix = ''
+        self.context = self.context_prefix + ' ' + self.context_suffix
 
 
 if __name__ == '__main__':

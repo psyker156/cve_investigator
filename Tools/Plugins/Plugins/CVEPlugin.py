@@ -23,7 +23,7 @@ class CVEPlugin(BasePlugin.BasePlugin):
                         '# cve CVE-XXXX-XXXX - Prints a summary of a given CVE if available\n'
                         '# cve verbose CVE-XXXX-XXXX - Prints a long version of the CVE information\n'
                         '# cve AnyCVEParameter CVE-XXXX-XXXX - Prints the data for a given CVE part\n'
-                        '\t valid inputs are as documented in the CVE 2.0 API documentation')
+                        '# cve show CVE-XXX-XXXX - Prints the available parameters for a given CVE\n')
 
 
     INVALID_ARGUMENT_ERROR = -1
