@@ -103,7 +103,8 @@ class Console:
 
     def set_context(self, params):
         self.context_prefix = params[1]
-        self.context_suffix = params[2]
+        if len(params) > 2:
+            self.context_suffix = params[2]
         self.context = self.context_prefix + ' ' + self.context_suffix
 
 

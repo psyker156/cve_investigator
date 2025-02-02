@@ -56,7 +56,7 @@ class CVEPlugin(BasePlugin.BasePlugin):
         """
         This is a localized command parser that every plugin must implement.
         :param args: a list of commands including the command name
-        :return: boolean, True if the command is valid, False otherwise
+        :return: return_value, cve_number, sub_command
         """
         return_value = self.COMMAND_TYPE_INVALID
         cve_number = None
