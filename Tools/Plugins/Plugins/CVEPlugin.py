@@ -15,7 +15,7 @@ import Tools.Plugins.BasePlugin as BasePlugin
 
 class CVEPlugin(BasePlugin.BasePlugin):
     """
-    This plugin simply displays general information about cve_investigator
+    This plugin allows the user to explore CVEs
     """
     ITERATION = 1
 

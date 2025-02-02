@@ -78,7 +78,7 @@ class BasePlugin(object):
         :param plugin_description:
         """
         if len(plugin_description) > self._description_max_len:
-            raise Exception(f'Invalid plugin description length {len(plugin_description)} for plugin {plugin_description}\n')
+            raise Exception(f'Invalid plugin description length {len(plugin_description)} for plugin {plugin_description}')
         self._description = plugin_description
 
 
@@ -89,7 +89,7 @@ class BasePlugin(object):
         :param message: string, the error message, cannot exceed 60 chars
         """
         if code in self._plugin_error_messages.keys():
-            raise Exception(f'Can\'t register error code {code}, already registered\n')
+            raise Exception(f'Can\'t register error code {code}, already registered')
         if len(message) > self._description_max_len:
             raise Exception(f'Error message length is too long {len(message)}\n')
         self._plugin_error_messages[code] = message
@@ -102,7 +102,7 @@ class BasePlugin(object):
         :return: string, the error message for the given error code
         """
         if code not in self._plugin_error_messages.keys():
-            raise Exception(f'Can\'t find error code {code} in plugin {self.plugin_identity()}\n')
+            raise Exception(f'Can\'t find error code {code} in plugin {self.plugin_identity()}')
         return self._plugin_error_messages[code]
 
 
@@ -120,7 +120,7 @@ class BasePlugin(object):
         :param new_help_string: string, a formated string of help text
         """
         if type(new_help_string) != str:
-            raise Exception(f'Invalid help string {type(new_help_string)}, must be string\n')
+            raise Exception(f'Invalid help string {type(new_help_string)}, must be string')
         self._help_string = new_help_string
 
 
@@ -129,27 +129,27 @@ class BasePlugin(object):
         This method makes sure that the kid plugin matches the base plugin!
         """
         if BasePlugin.ITERATION != self.ITERATION:
-            raise EnvironmentError('Plugin iteration does not match base plugin iteration\n')
+            raise EnvironmentError('Plugin iteration does not match base plugin iteration')
 
         if BasePlugin.run == self.run:
             raise EnvironmentError('Plugin run is not implemented\n')
 
         if BasePlugin.validate_command == self.validate_command:
-            raise EnvironmentError('Plugin validate_command() is not implemented\n')
+            raise EnvironmentError('Plugin validate_command() is not implemented')
 
         if BasePlugin._identity == self._identity:
-            raise EnvironmentError('Plugin identity is not set\n')
+            raise EnvironmentError('Plugin identity is not set')
 
         if BasePlugin._description == self._description:
-            raise EnvironmentError('Plugin identity is not set\n')
+            raise EnvironmentError('Plugin identity is not set')
 
         if BasePlugin._type == self._type:
-            raise EnvironmentError('Plugin type is not set\n')
+            raise EnvironmentError('Plugin type is not set')
 
         if BasePlugin._help_string == self._help_string:
-            raise EnvironmentError('Plugin help is not set\n')
+            raise EnvironmentError('Plugin help is not set')
 
-        print(f'Plugin \'{self.plugin_identity()}\' is valid and ready to be used.\n')
+        print(f'Plugin \'{self.plugin_identity()}\' is valid and ready to be used.')
 
 
     def validate_command(self, args):
