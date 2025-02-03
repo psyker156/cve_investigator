@@ -23,7 +23,8 @@ def call_cve_api(cve=None,
                  start=None,
                  end=None,
                  index=0,
-                 nistapikey=True):
+                 nistapikey=True,
+                 safe=False):
     request_string = CVE_API_URL + '?' + 'startIndex=' + str(index) + '&'
     if start is not None and not yesterday:
         request_string += 'pubStartDate=' + start + 'T00:00:00.000' + '&'
@@ -43,7 +44,7 @@ def call_cve_api(cve=None,
     request_string += '' if keyword is None else 'keywordSearch=' + keyword + '&'
     request_string += '' if cve is None else 'cveId=' + cve + '&'
 
-    return call_nist_api(nistapikey, request_string)
+    return call_nist_api(nistapikey, request_string, safe=safe)
 
 def call_cve_history_api(cve, use_api_key=False, index=0):
     request_string = CVE_API_URL + '?' + 'cveId=' + cve

@@ -19,6 +19,15 @@ class CVE:
     This class conforms to the CVE API Schema: https://csrc.nist.gov/schema/nvd/api/2.0/cve_api_json_2.0.schema
     """
 
+    # Status details are available here: https://nvd.nist.gov/vuln/vulnerability-status
+    VALID_CVE_STATUS = ['Received',
+                        'Awaiting Analysis',
+                        'Undergoing Analysis',
+                        'Analyzed',
+                        'Modified',
+                        'Deferred',
+                        'Rejected']
+
     def __init__(self, individual_cve):
         """
         The constructor for CVE. Following this being called, the CVE is fully populated and no additional
