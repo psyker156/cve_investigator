@@ -17,13 +17,6 @@ class CVSSMetricV30:
     This class conforms to the CVE API Schema: https://csrc.nist.gov/schema/nvd/api/2.0/cve_api_json_2.0.schema
     """
 
-    infos = None
-    source = None
-    type = None
-    version = None
-    base_score = None
-    attack_vector = None
-
     def __init__(self, individual_cvss):
         """
         The constructor for CVSS. Following this being called, the CVSS is fully populated and no additional
@@ -32,6 +25,13 @@ class CVSSMetricV30:
                                The parameter can either be a string or a json object.
                                https://docs.python.org/3/library/json.html
         """
+        self.infos = None
+        self.source = None
+        self.type = None
+        self.version = None
+        self.base_score = None
+        self.attack_vector = None
+
         # We want to be able to call the same constructor with either a string or json
         # The code bellow is what allows for this.
         cvss_json = individual_cvss

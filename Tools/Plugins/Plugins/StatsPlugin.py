@@ -11,6 +11,7 @@ import textwrap
 
 from NetworkServices.NISTAPIServices import call_cve_api
 from Parsers.CVE import CVE
+from Parsers.CVSSMetricParsers import *
 from Parsers.CWE import CWE
 from Tools.configuration import *
 
@@ -45,7 +46,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
     COMMAND_TYPE_INVALID = 0
     COMMAND_SET_START = 1                       # This command sets the start date for the stats range
     COMMAND_SET_END = 2                         # This command sets the end date for the stats range
-    COMMAND_CRUNCH_CVSS_DISTRIBUTION = 3        # This command will generate the stats according to the configuration
+    COMMAND_CRUNCH_CVSS_DISTRIBUTION = 3        # This command will generate general CVSS base score stats
     COMMAND_RESET = 4                           # This command will reset all configuration if used alone, specific config otherwise
     COMMAND_ADD_KEYWORD = 5                     # This command will add a keyword to the search keys
     COMMAND_REMOVE_KEYWORD = 6
@@ -56,10 +57,14 @@ class StatsPlugin(BasePlugin.BasePlugin):
     COMMAND_SHOW_CONFIG = 11                    # This will display the current plugin configuration
     COMMAND_OMIT_CVE_STATUS = 12                # This will add a CVE status to be omitted from the stats
     COMMAND_INCLUDE_CVE_STATUS = 13             # This will remove an omitted status
+    COMMAND_CRUNCH_ATTACK_VECTOR = 14           # This will generate general statistics relating to Attack Vector
+    COMMAND_CRUNCH_CWE_TOP_10 = 15              # This will return CWE top 10 along with number of instance
 
     VALID_COMMANDS = ['set_start',
                       'set_end',
                       'crunch_cvss_distribution',
+                      'crunch_attack_vector',
+                      'crunch_cwe_top_10',
                       'reset',
                       'add_keyword',
                       'remove_keyword',
@@ -85,7 +90,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
         self.register_error_code(self.INVALID_CONFIGURATION_ERROR, self.INVALID_CONFIGURATION_MESSAGE)
 
         self.start = "2025-01-01"
-        self.end = "2025-02-07"
+        self.end = "2025-01-07"
         self.keyword = []
         self.cwe = []
         self.omitted_cve_status = ['Rejected']
@@ -194,17 +199,32 @@ class StatsPlugin(BasePlugin.BasePlugin):
         if len(self.omitted_cve_status) == 0:
             return return_value
 
-        if (hasattr(usable_cve.infos, 'vulnStatus')
-                and usable_cve.infos.vulnStatus.casefold() in [x.casefold() for x in self.omitted_cve_status]):
+        if usable_cve.status.casefold() in [x.casefold() for x in self.omitted_cve_status]:
             return_value = False
 
         return return_value
+
+    def organise_cvss_base_score(self, base_score_list):
+        data = {'low':[], 'medium':[], 'high':[], 'critical':[]}
+        for base_score in base_score_list:
+            if 0 <= base_score < 4:
+                data['low'].append(base_score)
+            elif 4 <= base_score < 7:
+                data['medium'].append(base_score)
+            elif 7 <= base_score < 9:
+                data['high'].append(base_score)
+            elif 9 <= base_score <= 10:
+                data['critical'].append(base_score)
+        return data
+
     def validate_command(self, args):
         """
         This is a localized command parser that every plugin must implement.
         VALID_COMMANDS = ['set_start',
                           'set_end',
                           'crunch_cvss_distribution',
+                          'crunch_attack_vector',
+                          'crunch_cwe_top_10',
                           'reset',
                           'add_keyword',
                           'remove_keyword',
@@ -238,6 +258,10 @@ class StatsPlugin(BasePlugin.BasePlugin):
             return_value = self.COMMAND_SET_END
         elif command == 'crunch_cvss_distribution' and param is None:
             return_value = self.COMMAND_CRUNCH_CVSS_DISTRIBUTION
+        elif command == 'crunch_attack_vector' and param is None:
+            return_value = self.COMMAND_CRUNCH_ATTACK_VECTOR
+        elif command == 'crunch_cwe_top_10' and param is None:
+            return_value = self.COMMAND_CRUNCH_CWE_TOP_10
         elif command == 'reset' and param is None:
             return_value = self.COMMAND_RESET
         elif command == 'add_keyword' and param is not None:
@@ -278,6 +302,10 @@ class StatsPlugin(BasePlugin.BasePlugin):
             return_value = self.set_end(param)
         elif command_code == self.COMMAND_CRUNCH_CVSS_DISTRIBUTION:
             return_value = self.crunch_cvss_distribution()
+        elif command_code == self.COMMAND_CRUNCH_ATTACK_VECTOR:
+            return_value = self.crunch_attack_vector()
+        elif command_code == self.COMMAND_CRUNCH_CWE_TOP_10:
+            return_value = self.crunch_cwe_top_10()
         elif command_code == self.COMMAND_RESET:
             return_value = self.reset_configuration()
         elif command_code == self.COMMAND_ADD_KEYWORD:
@@ -309,37 +337,32 @@ class StatsPlugin(BasePlugin.BasePlugin):
         self.end = param
         return self.RUN_SUCCESS
 
-    def crunch_cvss_distribution(self):
-        self.filter_cache()
+    def pre_crunch_setup(self):
         if self.start is None or self.end is None:
+            return False
+        self.filter_cache()
+        return True
+
+    def crunch_cvss_distribution(self):
+        if not self.pre_crunch_setup():
             return self.INVALID_CONFIGURATION_ERROR
-        print(self._format_text(f'CVSS Distribution for CVEs published between {self.start} and {self.end}:', width=100))
+
+        print(self._format_text(f'CVSS distribution for CVEs published between {self.start} and {self.end}:', width=100))
         print(self._format_text(f'Numbers of CVEs: {len(self.LOCAL_CACHE_FILTERED)}', tabulation=1))
 
         cvss_crunched_data = {}
-        more_than_one_version = []
-        more_than_one_same_version = []
-        for usable_cve in self.LOCAL_CACHE_FILTERED:
-            if hasattr(usable_cve.infos, 'metrics'):
-                t = vars(usable_cve.infos.metrics)
-                if len(t) > 0:
-                    if len(t) > 1:
-                        more_than_one_version.append(t.keys())
-                    for version in t.keys():
-                        if version not in cvss_crunched_data:
-                            cvss_crunched_data[version] = []
 
-                        if len(t[version]) > 1:
-                            more_than_one_same_version.append(t[version])
-                        for single_metric in t[version]:
-                            cvss_crunched_data[version].append(single_metric.cvssData.baseScore)
-        print(self._format_text(f'{len(more_than_one_version)} CVEs had CVSS scores using multiple versions', tabulation=1))
-        print(self._format_text(f'{len(more_than_one_same_version)} CVEs had multiple CVSS scores using the same version ', tabulation=1))
+        for usable_cve in self.LOCAL_CACHE_FILTERED:
+            for cvss in usable_cve.cvss:
+                if cvss.version not in cvss_crunched_data:
+                    cvss_crunched_data[cvss.version] = [cvss.base_score]
+                else:
+                    cvss_crunched_data[cvss.version].append(cvss.base_score)
 
         for version in cvss_crunched_data.keys():
             usable_data = cvss_crunched_data[version]
             parsed_data = self.organise_cvss_base_score(usable_data)
-            print(self._format_text(f'{version} data:', tabulation=1))
+            print(self._format_text(f'CVSS v{version} data:', tabulation=1))
             print(self._format_text(f'{len(usable_data)} CVEs with {version} data', tabulation=2))
             print(self._format_text(f'Average base score {statistics.mean(usable_data)}', tabulation=2))
             print(self._format_text(f'Median base score {statistics.median(usable_data)}', tabulation=2))
@@ -350,18 +373,68 @@ class StatsPlugin(BasePlugin.BasePlugin):
 
         return self.RUN_SUCCESS
 
-    def organise_cvss_base_score(self, base_score_list):
-        data = {'low':[], 'medium':[], 'high':[], 'critical':[]}
-        for base_score in base_score_list:
-            if 0 <= base_score < 4:
-                data['low'].append(base_score)
-            elif 4 <= base_score < 7:
-                data['medium'].append(base_score)
-            elif 7 <= base_score < 9:
-                data['high'].append(base_score)
-            elif 9 <= base_score <= 10:
-                data['critical'].append(base_score)
-        return data
+    def crunch_attack_vector(self):
+        if not self.pre_crunch_setup():
+            return self.INVALID_CONFIGURATION_ERROR
+
+        vectors_crunched_data = {}
+        cves_without_cvss = []
+
+        print(self._format_text(f'Attack Vector distribution for CVEs published between {self.start} and {self.end}:', width=100))
+        print(self._format_text(f'Numbers of CVEs: {len(self.LOCAL_CACHE_FILTERED)}', tabulation=1))
+
+        for usable_cve in self.LOCAL_CACHE_FILTERED:
+            if len(usable_cve.cvss) == 0:
+                cves_without_cvss.append(usable_cve.infos.id)
+                continue
+            for cvss in usable_cve.cvss:
+                if cvss.attack_vector is not None:
+                    if cvss.attack_vector not in vectors_crunched_data:
+                        vectors_crunched_data[cvss.attack_vector] = 1
+                        break
+                    else:
+                        vectors_crunched_data[cvss.attack_vector] += 1
+                        break
+
+        print(self._format_text(f'The following CVE do not have Attack Vector information:', tabulation=1, width=100))
+        print(self._format_text(f'{cves_without_cvss}', tabulation=2, width=100))
+        print()
+        print(self._format_text(f'Attack Vector distribution', tabulation=1))
+        for k in vectors_crunched_data.keys():
+            print(self._format_text(f'AV:{k} {vectors_crunched_data[k]}', tabulation=2))
+
+        return self.RUN_SUCCESS
+
+    def crunch_cwe_top_10(self):
+        if not self.pre_crunch_setup():
+            return self.INVALID_CONFIGURATION_ERROR
+
+        cwe_basic_infos = {}
+        unknown_cwe_cves = []
+
+        print(self._format_text(f'Top 10 CWE for CVEs published between {self.start} and {self.end}:', width=100))
+
+        for usable_cve in self.LOCAL_CACHE_FILTERED:
+            if len(usable_cve.cwe) == 0:
+                unknown_cwe_cves.append(usable_cve.infos.id)
+                continue
+
+            for cwe in usable_cve.cwe:
+                if cwe not in cwe_basic_infos:
+                    cwe_basic_infos[cwe] = 1
+                else:
+                    cwe_basic_infos[cwe] += 1
+
+        print(self._format_text(f'The following CVE do not have CWE information:', tabulation=1, width=100))
+        print(self._format_text(f'{unknown_cwe_cves}', tabulation=2, width=100))
+        print()
+        sorted_keys = sorted(cwe_basic_infos, key=lambda k: cwe_basic_infos[k], reverse=True)
+        cwe_parser = CWE()
+        for key in sorted_keys if len(sorted_keys) <= 10 else sorted_keys[:10]:
+            print(self._format_text(f'{key}: {cwe_basic_infos[key]}', tabulation=1))
+            print(self._format_text(f'{cwe_parser.description_for_code(key)}', tabulation=2, width=100))
+
+        return self.RUN_SUCCESS
 
     def reset_configuration(self):
         self.start = None
@@ -456,6 +529,8 @@ class StatsPlugin(BasePlugin.BasePlugin):
         for d in wrapped_text:
             suffix = '' if len_wrapped_text == 1 else '\n'
             end_result += f'{'\t'*tabulation}{d}{suffix}'
+        if end_result[-1] == '\n':
+            end_result = end_result[:-1]
         return end_result
 
 

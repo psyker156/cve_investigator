@@ -6,6 +6,8 @@ Copyright (C) 2025  Philippe Godbout
 import json
 from types import SimpleNamespace
 
+from Parsers.CVSSMetricParsers.helper import version_agnostic_cvss_parser
+
 MANDATORY_CVE_FIELDS = ["id",
                         "published",
                         "lastModified",
@@ -37,6 +39,10 @@ class CVE:
                                https://docs.python.org/3/library/json.html
         """
         self.infos = None
+        self.cvss = []
+        self.cwe = []
+        self.status = 'Unknown'
+
         # We want to be able to call the same constructor with either a string or json
         # The code bellow is what allows for this.
         cve_json = individual_cve
@@ -55,6 +61,20 @@ class CVE:
         cve_string = json.dumps(cve_json)
         self.infos = json.loads(cve_string, object_hook=lambda d: SimpleNamespace(**d))
 
+        # Now populate the specialized cvss information
+        if 'metrics' in cve_json.keys():
+            for version in cve_json['metrics'].keys():
+                for cvss in cve_json['metrics'][version]:
+                    self.cvss.append(version_agnostic_cvss_parser(version, cvss))
+                    pass
+
+        if 'vulnStatus' in cve_json.keys():
+            self.status = cve_json['vulnStatus']
+
+        if 'weaknesses' in cve_json.keys():
+            for weakness in cve_json['weaknesses']:
+                for description in weakness['description']:
+                    self.cwe.append(description['value'])
 
     def is_cve_valid(self, cve):
         """
