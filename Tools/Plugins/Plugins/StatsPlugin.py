@@ -59,12 +59,14 @@ class StatsPlugin(BasePlugin.BasePlugin):
     COMMAND_INCLUDE_CVE_STATUS = 13             # This will remove an omitted status
     COMMAND_CRUNCH_ATTACK_VECTOR = 14           # This will generate general statistics relating to Attack Vector
     COMMAND_CRUNCH_CWE_TOP_10 = 15              # This will return CWE top 10 along with number of instance
+    COMMAND_CRUNCH_CVSS_VERSION_REPRESENTATION = 16     # Computes information about CVSS versions adoption
 
     VALID_COMMANDS = ['set_start',
                       'set_end',
                       'crunch_cvss_distribution',
                       'crunch_attack_vector',
                       'crunch_cwe_top_10',
+                      'crunch_cvss_version_representation',
                       'reset',
                       'add_keyword',
                       'remove_keyword',
@@ -225,6 +227,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
                           'crunch_cvss_distribution',
                           'crunch_attack_vector',
                           'crunch_cwe_top_10',
+                          'crunch_cvss_version_representation',
                           'reset',
                           'add_keyword',
                           'remove_keyword',
@@ -262,6 +265,8 @@ class StatsPlugin(BasePlugin.BasePlugin):
             return_value = self.COMMAND_CRUNCH_ATTACK_VECTOR
         elif command == 'crunch_cwe_top_10' and param is None:
             return_value = self.COMMAND_CRUNCH_CWE_TOP_10
+        elif command == 'crunch_cvss_version_representation' and param is None:
+            return_value = self.COMMAND_CRUNCH_CVSS_VERSION_REPRESENTATION
         elif command == 'reset' and param is None:
             return_value = self.COMMAND_RESET
         elif command == 'add_keyword' and param is not None:
@@ -306,6 +311,8 @@ class StatsPlugin(BasePlugin.BasePlugin):
             return_value = self.crunch_attack_vector()
         elif command_code == self.COMMAND_CRUNCH_CWE_TOP_10:
             return_value = self.crunch_cwe_top_10()
+        elif command_code == self.COMMAND_CRUNCH_CVSS_VERSION_REPRESENTATION:
+            return_value = self.crunch_cvss_version_representation()
         elif command_code == self.COMMAND_RESET:
             return_value = self.reset_configuration()
         elif command_code == self.COMMAND_ADD_KEYWORD:
@@ -435,6 +442,58 @@ class StatsPlugin(BasePlugin.BasePlugin):
             print(self._format_text(f'{cwe_parser.description_for_code(key)}', tabulation=2, width=100))
 
         return self.RUN_SUCCESS
+
+    def crunch_cvss_version_representation(self):
+        if not self.pre_crunch_setup():
+            return self.INVALID_CONFIGURATION_ERROR
+
+        v2_qty = 0
+        v30_qty = 0
+        v31_qty = 0
+        v40_qty = 0
+        no_data_qty = 0
+
+        for cve in self.LOCAL_CACHE_FILTERED:
+            v2 = False
+            v30 = False
+            v31 = False
+            v40 = False
+
+            if len(cve.cvss) == 0:
+                no_data_qty += 1
+                continue
+
+            for cvss in cve.cvss:
+                if cvss.version == '2.0':
+                    v2 = True
+                elif cvss.version == '3.0':
+                    v30 = True
+                elif cvss.version == '3.1':
+                    v31 = True
+                elif cvss.version == '4.0':
+                    v40 = True
+
+            if v2:
+                v2_qty += 1
+            if v30:
+                v30_qty += 1
+            if v31:
+                v31_qty += 1
+            if v40:
+                v40_qty += 1
+
+        print(self._format_text(f'CVSS adoption data for CVEs published between {self.start} and {self.end}:', width=100))
+        print(self._format_text(f'CVEs missing CVSS information: {no_data_qty}', tabulation=1))
+        print(self._format_text(f'CVEs with CVSS v2.0 information: {v2_qty}', tabulation=1))
+        print(self._format_text(f'CVEs with CVSS v3.0 information: {v30_qty}', tabulation=1))
+        print(self._format_text(f'CVEs with CVSS v3.1 information: {v31_qty}', tabulation=1))
+        print(self._format_text(f'CVEs with CVSS v4.0 information: {v40_qty}', tabulation=1))
+
+
+
+
+        return self.RUN_SUCCESS
+
 
     def reset_configuration(self):
         self.start = None
