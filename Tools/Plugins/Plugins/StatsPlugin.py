@@ -40,6 +40,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
     INVALID_CONFIGURATION_MESSAGE = "Minimal configuration requires Start and End Date"
 
     LOCAL_CACHE = {}
+    LOCAL_CACHE_FILTERED = []
 
     COMMAND_TYPE_INVALID = 0
     COMMAND_SET_START = 1                       # This command sets the start date for the stats range
@@ -83,11 +84,11 @@ class StatsPlugin(BasePlugin.BasePlugin):
         self.register_error_code(self.INVALID_ARGUMENT_ERROR, self.INVALID_ARGUMENT_MESSAGE)
         self.register_error_code(self.INVALID_CONFIGURATION_ERROR, self.INVALID_CONFIGURATION_MESSAGE)
 
-        self.start = "2023-01-01"
-        self.end = "2023-03-31"
+        self.start = "2025-01-01"
+        self.end = "2025-02-07"
         self.keyword = []
         self.cwe = []
-        self.omitted_cve_status = []
+        self.omitted_cve_status = ['Rejected']
 
         self.load_cache()
 
@@ -108,6 +109,96 @@ class StatsPlugin(BasePlugin.BasePlugin):
             print(f'{cwe_str} is not a valid CWE or CWE repository is out of date')
         return return_value
 
+    def filter_cache(self):
+        """
+        This method will filter the main cache in a way that the filtered cache may only contain CVEs that
+        respect the stats plugin configuration criteria.
+
+        Caches are:
+            LOCAL_CACHE = {}
+            LOCAL_CACHE_FILTERED = []
+
+        Filters criteria are:
+            self.start = "XXXX-XX-XX"
+            self.end = "XXXX-XX-XX"
+            self.keyword = []
+            self.cwe = []
+            self.omitted_cve_status = []
+        """
+        print(f'Filtering cache base on current configuration:')
+        self.show_config()
+        print(f'Filtering...')
+        for cve in self.LOCAL_CACHE:
+            usable_cve = self.LOCAL_CACHE[cve]
+            if (self.in_date_range(usable_cve)
+                    and self.contains_keywords(usable_cve)
+                    and self.contains_cwe(usable_cve)
+                    and self.is_not_within_status(usable_cve)):
+                # All matching criteria have checked positively!
+                self.LOCAL_CACHE_FILTERED.append(usable_cve)
+        print(f'Done filtering')
+        print(self._format_text(f'Pre-Filter CVE count: {len(self.LOCAL_CACHE)}', tabulation=1))
+        print(self._format_text(f'Post-Filter CVE count: {len(self.LOCAL_CACHE_FILTERED)}', tabulation=1))
+
+    def in_date_range(self, usable_cve):
+        """
+        This will validate if a CVE is within the configured date range.
+        :param usable_cve: a CVE object
+        :return: True if within, else False
+        """
+        return_value = False
+
+        start = datetime.datetime.fromisoformat(self.start + 'T00:00:00.000')
+        end = datetime.datetime.fromisoformat(self.end + 'T23:59:59.999')
+        cve_datetime = datetime.datetime.fromisoformat(usable_cve.infos.published)
+
+        if start <= cve_datetime <= end:
+            return_value = True
+
+        return return_value
+
+    def contains_keywords(self, usable_cve):
+        return_value = True
+        if len(self.keyword) == 0:
+            return return_value
+        descriptions_concatenation = ""
+
+        for description in usable_cve.infos.descriptions:
+            descriptions_concatenation += description.value + " "
+
+        for keyword in self.keyword:
+            if keyword.casefold() not in descriptions_concatenation.casefold():
+                return_value = False
+                break
+
+        return return_value
+
+    def contains_cwe(self, usable_cve):
+        return_value = False
+
+        if len(self.cwe) == 0:
+            return_value = True
+            return return_value
+
+        if hasattr(usable_cve.infos, 'weaknesses'):
+            for weakness in usable_cve.infos.weaknesses:
+                for single_description in weakness.description:
+                    if single_description.value.casefold() in [x.casefold() for x in self.cwe]:
+                        return_value = True
+                        break
+
+        return return_value
+
+    def is_not_within_status(self, usable_cve):
+        return_value = True
+        if len(self.omitted_cve_status) == 0:
+            return return_value
+
+        if (hasattr(usable_cve.infos, 'vulnStatus')
+                and usable_cve.infos.vulnStatus.casefold() in [x.casefold() for x in self.omitted_cve_status]):
+            return_value = False
+
+        return return_value
     def validate_command(self, args):
         """
         This is a localized command parser that every plugin must implement.
@@ -219,16 +310,16 @@ class StatsPlugin(BasePlugin.BasePlugin):
         return self.RUN_SUCCESS
 
     def crunch_cvss_distribution(self):
+        self.filter_cache()
         if self.start is None or self.end is None:
             return self.INVALID_CONFIGURATION_ERROR
         print(self._format_text(f'CVSS Distribution for CVEs published between {self.start} and {self.end}:', width=100))
-        print(self._format_text(f'Numbers of CVEs published: {len(self.LOCAL_CACHE)}', tabulation=1))
+        print(self._format_text(f'Numbers of CVEs: {len(self.LOCAL_CACHE_FILTERED)}', tabulation=1))
 
         cvss_crunched_data = {}
         more_than_one_version = []
         more_than_one_same_version = []
-        for cve in self.LOCAL_CACHE:
-            usable_cve = self.LOCAL_CACHE[cve]
+        for usable_cve in self.LOCAL_CACHE_FILTERED:
             if hasattr(usable_cve.infos, 'metrics'):
                 t = vars(usable_cve.infos.metrics)
                 if len(t) > 0:
@@ -297,7 +388,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
     def add_cwe(self, param):
         return_value = self.INVALID_ARGUMENT_ERROR
         if param[0:4].casefold() == 'cwe-'.casefold() and param not in self.cwe:
-            self.cwe.append(param)
+            self.cwe.append(param.upper())
             return_value = self.RUN_SUCCESS
         return return_value
 

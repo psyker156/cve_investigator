@@ -30,4 +30,6 @@ def call_nist_api(use_api_key, url, safe=False):
     else:
         response = call_url_based_rest_api(url, safe=safe)
 
+    time.sleep(6)   # This is based on NIST recommendation: https://nvd.nist.gov/general/news/API-Key-Announcement
+
     return json.loads(response)
