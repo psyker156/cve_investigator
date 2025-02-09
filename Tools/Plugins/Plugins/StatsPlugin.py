@@ -6,6 +6,7 @@ Copyright (C) 2025  Philippe Godbout
 import datetime
 import pprint
 import re
+import statistics
 import textwrap
 
 from NetworkServices.NISTAPIServices import call_cve_api
@@ -41,23 +42,23 @@ class StatsPlugin(BasePlugin.BasePlugin):
     LOCAL_CACHE = {}
 
     COMMAND_TYPE_INVALID = 0
-    COMMAND_SET_START = 1           # This command sets the start date for the stats range
-    COMMAND_SET_END = 2             # This command sets the end date for the stats range
-    COMMAND_CRUNCH = 3              # This command will generate the stats according to the configuration
-    COMMAND_RESET = 4               # This command will reset all configuration if used alone, specific config otherwise
-    COMMAND_ADD_KEYWORD = 5         # This command will add a keyword to the search keys
+    COMMAND_SET_START = 1                       # This command sets the start date for the stats range
+    COMMAND_SET_END = 2                         # This command sets the end date for the stats range
+    COMMAND_CRUNCH_CVSS_DISTRIBUTION = 3        # This command will generate the stats according to the configuration
+    COMMAND_RESET = 4                           # This command will reset all configuration if used alone, specific config otherwise
+    COMMAND_ADD_KEYWORD = 5                     # This command will add a keyword to the search keys
     COMMAND_REMOVE_KEYWORD = 6
-    COMMAND_ADD_CWE = 7             # This command will limit the statistics to a set of CVE based on CWE
+    COMMAND_ADD_CWE = 7                         # This command will limit the statistics to a set of CVE based on CWE
     COMMAND_REMOVE_CWE = 8
-    COMMAND_CLEAR_CACHE = 9         # This command will flush the local cache for the plugin
-    COMMAND_LOAD_CACHE = 10         # This command will add/update the CVEs from the range to the cache
-    COMMAND_SHOW_CONFIG = 11        # This will display the current plugin configuration
-    COMMAND_OMIT_CVE_STATUS = 12    # This will add a CVE status to be omitted from the stats
-    COMMAND_INCLUDE_CVE_STATUS = 13 # This will remove an omitted status
+    COMMAND_CLEAR_CACHE = 9                     # This command will flush the local cache for the plugin
+    COMMAND_LOAD_CACHE = 10                     # This command will add/update the CVEs from the range to the cache
+    COMMAND_SHOW_CONFIG = 11                    # This will display the current plugin configuration
+    COMMAND_OMIT_CVE_STATUS = 12                # This will add a CVE status to be omitted from the stats
+    COMMAND_INCLUDE_CVE_STATUS = 13             # This will remove an omitted status
 
     VALID_COMMANDS = ['set_start',
                       'set_end',
-                      'crunch',
+                      'crunch_cvss_distribution',
                       'reset',
                       'add_keyword',
                       'remove_keyword',
@@ -82,11 +83,13 @@ class StatsPlugin(BasePlugin.BasePlugin):
         self.register_error_code(self.INVALID_ARGUMENT_ERROR, self.INVALID_ARGUMENT_MESSAGE)
         self.register_error_code(self.INVALID_CONFIGURATION_ERROR, self.INVALID_CONFIGURATION_MESSAGE)
 
-        self.start = None
-        self.end = None
+        self.start = "2023-01-01"
+        self.end = "2023-03-31"
         self.keyword = []
         self.cwe = []
         self.omitted_cve_status = []
+
+        self.load_cache()
 
     def validate_date(self, date_str):
         try:
@@ -110,7 +113,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
         This is a localized command parser that every plugin must implement.
         VALID_COMMANDS = ['set_start',
                           'set_end',
-                          'crunch',
+                          'crunch_cvss_distribution',
                           'reset',
                           'add_keyword',
                           'remove_keyword',
@@ -142,8 +145,8 @@ class StatsPlugin(BasePlugin.BasePlugin):
             return_value = self.COMMAND_SET_START
         elif command == 'set_end' and self.validate_date(param):
             return_value = self.COMMAND_SET_END
-        elif command == 'crunch' and param is None:
-            return_value = self.COMMAND_CRUNCH
+        elif command == 'crunch_cvss_distribution' and param is None:
+            return_value = self.COMMAND_CRUNCH_CVSS_DISTRIBUTION
         elif command == 'reset' and param is None:
             return_value = self.COMMAND_RESET
         elif command == 'add_keyword' and param is not None:
@@ -182,8 +185,8 @@ class StatsPlugin(BasePlugin.BasePlugin):
             return_value = self.set_start(param)
         elif command_code == self.COMMAND_SET_END:
             return_value = self.set_end(param)
-        elif command_code == self.COMMAND_CRUNCH:
-            return_value = self.crunch()
+        elif command_code == self.COMMAND_CRUNCH_CVSS_DISTRIBUTION:
+            return_value = self.crunch_cvss_distribution()
         elif command_code == self.COMMAND_RESET:
             return_value = self.reset_configuration()
         elif command_code == self.COMMAND_ADD_KEYWORD:
@@ -215,9 +218,59 @@ class StatsPlugin(BasePlugin.BasePlugin):
         self.end = param
         return self.RUN_SUCCESS
 
-    def crunch(self):
-        pass
+    def crunch_cvss_distribution(self):
+        if self.start is None or self.end is None:
+            return self.INVALID_CONFIGURATION_ERROR
+        print(self._format_text(f'CVSS Distribution for CVEs published between {self.start} and {self.end}:', width=100))
+        print(self._format_text(f'Numbers of CVEs published: {len(self.LOCAL_CACHE)}', tabulation=1))
+
+        cvss_crunched_data = {}
+        more_than_one_version = []
+        more_than_one_same_version = []
+        for cve in self.LOCAL_CACHE:
+            usable_cve = self.LOCAL_CACHE[cve]
+            if hasattr(usable_cve.infos, 'metrics'):
+                t = vars(usable_cve.infos.metrics)
+                if len(t) > 0:
+                    if len(t) > 1:
+                        more_than_one_version.append(t.keys())
+                    for version in t.keys():
+                        if version not in cvss_crunched_data:
+                            cvss_crunched_data[version] = []
+
+                        if len(t[version]) > 1:
+                            more_than_one_same_version.append(t[version])
+                        for single_metric in t[version]:
+                            cvss_crunched_data[version].append(single_metric.cvssData.baseScore)
+        print(self._format_text(f'{len(more_than_one_version)} CVEs had CVSS scores using multiple versions', tabulation=1))
+        print(self._format_text(f'{len(more_than_one_same_version)} CVEs had multiple CVSS scores using the same version ', tabulation=1))
+
+        for version in cvss_crunched_data.keys():
+            usable_data = cvss_crunched_data[version]
+            parsed_data = self.organise_cvss_base_score(usable_data)
+            print(self._format_text(f'{version} data:', tabulation=1))
+            print(self._format_text(f'{len(usable_data)} CVEs with {version} data', tabulation=2))
+            print(self._format_text(f'Average base score {statistics.mean(usable_data)}', tabulation=2))
+            print(self._format_text(f'Median base score {statistics.median(usable_data)}', tabulation=2))
+            print(self._format_text(f'CVSS low: {len(parsed_data['low'])}', tabulation=2))
+            print(self._format_text(f'CVSS medium: {len(parsed_data['medium'])}', tabulation=2))
+            print(self._format_text(f'CVSS high: {len(parsed_data['high'])}', tabulation=2))
+            print(self._format_text(f'CVSS critical: {len(parsed_data['critical'])}', tabulation=2))
+
         return self.RUN_SUCCESS
+
+    def organise_cvss_base_score(self, base_score_list):
+        data = {'low':[], 'medium':[], 'high':[], 'critical':[]}
+        for base_score in base_score_list:
+            if 0 <= base_score < 4:
+                data['low'].append(base_score)
+            elif 4 <= base_score < 7:
+                data['medium'].append(base_score)
+            elif 7 <= base_score < 9:
+                data['high'].append(base_score)
+            elif 9 <= base_score <= 10:
+                data['critical'].append(base_score)
+        return data
 
     def reset_configuration(self):
         self.start = None

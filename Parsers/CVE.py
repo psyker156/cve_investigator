@@ -55,6 +55,7 @@ class CVE:
         cve_string = json.dumps(cve_json)
         self.infos = json.loads(cve_string, object_hook=lambda d: SimpleNamespace(**d))
 
+
     def is_cve_valid(self, cve):
         """
         This simply validates that the cve contains all the required fields

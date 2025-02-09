@@ -25,6 +25,8 @@ class Console:
         while True:
             # Get the command
             command = self.acquire_command()
+            if len(command) == 0:
+                continue
             parsed_command = [command]
             if command != 'unset_context':      # unset_context needs a special treatment... TODO review this
                 parsed_command = self.parse_command(command)
@@ -47,7 +49,10 @@ class Console:
 
 
     def acquire_command(self):
-        return input(f'{self.context}# ')
+        try:
+            return input(f'{self.context}# ')
+        except:
+            quit()
 
     def parse_command(self, command):
         parsed = command.split()
