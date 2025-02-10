@@ -40,9 +40,6 @@ class StatsPlugin(BasePlugin.BasePlugin):
     INVALID_CONFIGURATION_ERROR = -2
     INVALID_CONFIGURATION_MESSAGE = "Minimal configuration requires Start and End Date"
 
-    LOCAL_CACHE = {}
-    LOCAL_CACHE_FILTERED = []
-
     COMMAND_TYPE_INVALID = 0
     COMMAND_SET_START = 1                       # This command sets the start date for the stats range
     COMMAND_SET_END = 2                         # This command sets the end date for the stats range
@@ -84,6 +81,9 @@ class StatsPlugin(BasePlugin.BasePlugin):
         Simply sets up the plugin so it can be used.
         """
         super().__init__()
+        self.LOCAL_CACHE = {}
+        self.LOCAL_CACHE_FILTERED = []
+
         self.set_plugin_type('command')
         self.set_plugin_identity('stats')
         self.set_plugin_description('Quickly generates statistics about CVEs')
@@ -92,7 +92,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
         self.register_error_code(self.INVALID_CONFIGURATION_ERROR, self.INVALID_CONFIGURATION_MESSAGE)
 
         self.start = "2025-01-01"
-        self.end = "2025-01-07"
+        self.end = "2025-01-31"
         self.keyword = []
         self.cwe = []
         self.omitted_cve_status = ['Rejected']
@@ -132,6 +132,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
             self.cwe = []
             self.omitted_cve_status = []
         """
+        self.LOCAL_CACHE_FILTERED = []
         print(f'Filtering cache base on current configuration:')
         self.show_config()
         print(f'Filtering...')
@@ -384,7 +385,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
         if not self.pre_crunch_setup():
             return self.INVALID_CONFIGURATION_ERROR
 
-        vectors_crunched_data = {}
+        vectors_crunched_data = {'2.0':{}, '3.0':{}, '3.1':{}, '4.0':{}}
         cves_without_cvss = []
 
         print(self._format_text(f'Attack Vector distribution for CVEs published between {self.start} and {self.end}:', width=100))
@@ -395,20 +396,21 @@ class StatsPlugin(BasePlugin.BasePlugin):
                 cves_without_cvss.append(usable_cve.infos.id)
                 continue
             for cvss in usable_cve.cvss:
-                if cvss.attack_vector is not None:
-                    if cvss.attack_vector not in vectors_crunched_data:
-                        vectors_crunched_data[cvss.attack_vector] = 1
-                        break
-                    else:
-                        vectors_crunched_data[cvss.attack_vector] += 1
-                        break
+                if cvss.attack_vector not in vectors_crunched_data[cvss.version].keys():
+                    vectors_crunched_data[cvss.version][cvss.attack_vector] = 1
+                    break
+                else:
+                    vectors_crunched_data[cvss.version][cvss.attack_vector] += 1
+                    break
 
-        print(self._format_text(f'The following CVE do not have Attack Vector information:', tabulation=1, width=100))
+        print(self._format_text(f'The following CVE {len(cves_without_cvss)} do not have Attack Vector information:', tabulation=1, width=100))
         print(self._format_text(f'{cves_without_cvss}', tabulation=2, width=100))
         print()
         print(self._format_text(f'Attack Vector distribution', tabulation=1))
-        for k in vectors_crunched_data.keys():
-            print(self._format_text(f'AV:{k} {vectors_crunched_data[k]}', tabulation=2))
+        for version in vectors_crunched_data.keys():
+            print(self._format_text(f'CVSS version: {version}', tabulation=2))
+            for vector in vectors_crunched_data[version]:
+                print(self._format_text(f'AV: {vector}: {vectors_crunched_data[version][vector]}', tabulation=3))
 
         return self.RUN_SUCCESS
 
@@ -425,14 +427,19 @@ class StatsPlugin(BasePlugin.BasePlugin):
             if len(usable_cve.cwe) == 0:
                 unknown_cwe_cves.append(usable_cve.infos.id)
                 continue
-
+            cwe_list = []
             for cwe in usable_cve.cwe:
+                cwe_list.append(cwe)
+
+            cwe_list = list(set(cwe_list))
+
+            for cwe in cwe_list:
                 if cwe not in cwe_basic_infos:
                     cwe_basic_infos[cwe] = 1
                 else:
                     cwe_basic_infos[cwe] += 1
 
-        print(self._format_text(f'The following CVE do not have CWE information:', tabulation=1, width=100))
+        print(self._format_text(f'The following CVE ({len(unknown_cwe_cves)}) do not have CWE information:', tabulation=1, width=100))
         print(self._format_text(f'{unknown_cwe_cves}', tabulation=2, width=100))
         print()
         sorted_keys = sorted(cwe_basic_infos, key=lambda k: cwe_basic_infos[k], reverse=True)
