@@ -66,7 +66,7 @@ class InfoPlugin(BasePlugin.BasePlugin):
         """
         This is called by run and should never be called directly!!!!
         """
-        print(f'CVE Investogator version {CVE_INVESTIGATOR_VERSION} Community Edition')
+        print(f'CVE Investigator version {CVE_INVESTIGATOR_VERSION}')
         print(f'Release Date: {CVE_INVESTIGATOR_RELEASE_DATE}')
         print(f'Provided by {CVE_INVESTIGATOR_WEBSITE_URL}')
         print(f'Latest version available at: {CVE_INVESTIGATOR_SOURCE_URL}')

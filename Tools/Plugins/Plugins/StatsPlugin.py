@@ -4,8 +4,6 @@ Copyright (C) 2025  Philippe Godbout
 """
 
 import datetime
-import pprint
-import re
 import statistics
 import textwrap
 
@@ -57,6 +55,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
     COMMAND_CRUNCH_ATTACK_VECTOR = 14           # This will generate general statistics relating to Attack Vector
     COMMAND_CRUNCH_CWE_TOP_10 = 15              # This will return CWE top 10 along with number of instance
     COMMAND_CRUNCH_CVSS_VERSION_REPRESENTATION = 16     # Computes information about CVSS versions adoption
+    COMMAND_CRUNCH_EXPLOIT_STATUS = 17          # At this moment, this returns stats about CVSS v4.0 exploit status
 
     VALID_COMMANDS = ['set_start',
                       'set_end',
@@ -64,6 +63,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
                       'crunch_attack_vector',
                       'crunch_cwe_top_10',
                       'crunch_cvss_version_representation',
+                      'crunch_exploit_status',
                       'reset',
                       'add_keyword',
                       'remove_keyword',
@@ -91,13 +91,11 @@ class StatsPlugin(BasePlugin.BasePlugin):
         self.register_error_code(self.INVALID_ARGUMENT_ERROR, self.INVALID_ARGUMENT_MESSAGE)
         self.register_error_code(self.INVALID_CONFIGURATION_ERROR, self.INVALID_CONFIGURATION_MESSAGE)
 
-        self.start = "2025-01-01"
-        self.end = "2025-01-31"
+        self.start = None
+        self.end = None
         self.keyword = []
         self.cwe = []
         self.omitted_cve_status = ['Rejected']
-
-        self.load_cache()
 
     def validate_date(self, date_str):
         try:
@@ -133,7 +131,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
             self.omitted_cve_status = []
         """
         self.LOCAL_CACHE_FILTERED = []
-        print(f'Filtering cache base on current configuration:')
+        print(f'Filtering cache based on current configuration:')
         self.show_config()
         print(f'Filtering...')
         for cve in self.LOCAL_CACHE:
@@ -229,6 +227,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
                           'crunch_attack_vector',
                           'crunch_cwe_top_10',
                           'crunch_cvss_version_representation',
+                          'crunch_exploit_status',
                           'reset',
                           'add_keyword',
                           'remove_keyword',
@@ -268,6 +267,8 @@ class StatsPlugin(BasePlugin.BasePlugin):
             return_value = self.COMMAND_CRUNCH_CWE_TOP_10
         elif command == 'crunch_cvss_version_representation' and param is None:
             return_value = self.COMMAND_CRUNCH_CVSS_VERSION_REPRESENTATION
+        elif command == 'crunch_exploit_status' and param is None:
+            return_value = self.COMMAND_CRUNCH_EXPLOIT_STATUS
         elif command == 'reset' and param is None:
             return_value = self.COMMAND_RESET
         elif command == 'add_keyword' and param is not None:
@@ -314,6 +315,8 @@ class StatsPlugin(BasePlugin.BasePlugin):
             return_value = self.crunch_cwe_top_10()
         elif command_code == self.COMMAND_CRUNCH_CVSS_VERSION_REPRESENTATION:
             return_value = self.crunch_cvss_version_representation()
+        elif command_code == self.COMMAND_CRUNCH_EXPLOIT_STATUS:
+            return_value = self.crunch_exploit_status()
         elif command_code == self.COMMAND_RESET:
             return_value = self.reset_configuration()
         elif command_code == self.COMMAND_ADD_KEYWORD:
@@ -496,11 +499,26 @@ class StatsPlugin(BasePlugin.BasePlugin):
         print(self._format_text(f'CVEs with CVSS v3.1 information: {v31_qty}', tabulation=1))
         print(self._format_text(f'CVEs with CVSS v4.0 information: {v40_qty}', tabulation=1))
 
-
-
-
         return self.RUN_SUCCESS
 
+    def crunch_exploit_status(self):
+        if not self.pre_crunch_setup():
+            return self.INVALID_CONFIGURATION_ERROR
+
+        exploit_status = {}
+
+        for cve in self.LOCAL_CACHE_FILTERED:
+            for cvss in cve.cvss:
+                if cvss.version == '4.0':
+                    if cvss.exploit_maturity is not None and cvss.exploit_maturity not in exploit_status.keys():
+                        exploit_status[cvss.exploit_maturity] = 0
+                    elif cvss.exploit_maturity is not None:
+                        exploit_status[cvss.exploit_maturity] += 1
+
+        print(self._format_text(f'Exploit status for CVEs published between {self.start} and {self.end}:', width=100))
+        for k in exploit_status.keys():
+            print(self._format_text(f'{k}: {exploit_status[k]}', tabulation=1))
+        return self.RUN_SUCCESS
 
     def reset_configuration(self):
         self.start = None
