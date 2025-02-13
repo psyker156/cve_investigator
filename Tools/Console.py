@@ -39,10 +39,12 @@ class Console:
             if command_name not in self.pm.plugins:
                 self.invalid_command(command_name)
                 continue
-
-            result = self.pm.plugins[command_name].run(parsed_command)
-            if result != BasePlugin.RUN_SUCCESS:
-                print(self.pm.plugins[command_name].error_message(result))
+            try:
+                result = self.pm.plugins[command_name].run(parsed_command)
+                if result != BasePlugin.RUN_SUCCESS:
+                    print(self.pm.plugins[command_name].error_message(result))
+            except BaseException as e:
+                print(e)
 
         print('')
         print('Closing Console...')

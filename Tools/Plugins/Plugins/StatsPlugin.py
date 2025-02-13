@@ -5,7 +5,6 @@ Copyright (C) 2025  Philippe Godbout
 
 import datetime
 import statistics
-import textwrap
 
 from NetworkServices.NISTAPIServices import call_cve_api
 from Parsers.CVE import CVE
@@ -76,12 +75,12 @@ class StatsPlugin(BasePlugin.BasePlugin):
                       'include_cve_status']
 
 
-    def __init__(self):
+    def __init__(self, cache):
         """
         Simply sets up the plugin so it can be used.
         """
         super().__init__()
-        self.LOCAL_CACHE = {}
+        self.LOCAL_CACHE = cache
         self.LOCAL_CACHE_FILTERED = []
 
         self.set_plugin_type('command')
@@ -606,15 +605,6 @@ class StatsPlugin(BasePlugin.BasePlugin):
             return_value = self.RUN_SUCCESS
         return return_value
 
-    def _format_text(self, text, width=70, tabulation=0):
-        end_result = ''
-        wrapped_text = textwrap.wrap(text, width=width)
-        len_wrapped_text = len(wrapped_text)
-        for d in wrapped_text:
-            suffix = '' if len_wrapped_text == 1 else '\n'
-            end_result += f'{'\t'*tabulation}{d}{suffix}'
-        if end_result[-1] == '\n':
-            end_result = end_result[:-1]
-        return end_result
+
 
 

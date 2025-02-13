@@ -3,7 +3,7 @@ This file is part of the VulnerabilityManager project, a tool aimed at managing 
 Copyright (C) 2025  Philippe Godbout
 """
 
-
+import textwrap
 
 class BasePlugin(object):
     """
@@ -172,3 +172,14 @@ class BasePlugin(object):
         """
         print(params)
         return self.RUN_NOT_IMPLEMENTED
+
+    def _format_text(self, text, width=100, tabulation=0):
+        end_result = ''
+        wrapped_text = textwrap.wrap(text, width=width)
+        len_wrapped_text = len(wrapped_text)
+        for d in wrapped_text:
+            suffix = '' if len_wrapped_text == 1 else '\n'
+            end_result += f'{'\t'*tabulation}{d}{suffix}'
+        if end_result[-1] == '\n':
+            end_result = end_result[:-1]
+        return end_result

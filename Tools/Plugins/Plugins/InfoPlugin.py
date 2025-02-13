@@ -21,11 +21,12 @@ class InfoPlugin(BasePlugin.BasePlugin):
     INVALID_ARGUMENT_MESSAGE = "Info must be called without any arguments"
 
 
-    def __init__(self):
+    def __init__(self, cache):
         """
         Simply sets up the plugin so it can be used.
         """
         super().__init__()
+        self.LOCAL_CACHE = cache
         self.set_plugin_type('command')
         self.set_plugin_identity('info')
         self.set_plugin_description('Displays general information about cve_investigator')

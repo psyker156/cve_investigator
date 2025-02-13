@@ -6,6 +6,7 @@ Copyright (C) 2025  Philippe Godbout
 import json
 from types import SimpleNamespace
 
+
 from Parsers.CVSSMetricParsers.helper import version_agnostic_cvss_parser
 
 MANDATORY_CVE_FIELDS = ["id",

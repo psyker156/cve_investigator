@@ -4,10 +4,10 @@ Copyright (C) 2025  Philippe Godbout
 """
 import pprint
 import re
-import textwrap
 
 from NetworkServices.NISTAPIServices import call_cve_api
 from Parsers.CVE import CVE
+from Parsers.CWE import CWE
 from Tools.configuration import *
 
 import Tools.Plugins.BasePlugin as BasePlugin
@@ -31,7 +31,7 @@ class CVEPlugin(BasePlugin.BasePlugin):
 
     CVE_REGEX = r"(?i)^cve-\d{4}-\d{4,}$"
 
-    LOCAL_CACHE = {}
+
 
     COMMAND_TYPE_INVALID = 0
     COMMAND_TYPE_SHORT = 1
@@ -40,17 +40,17 @@ class CVEPlugin(BasePlugin.BasePlugin):
     COMMAND_TYPE_SHOW = 4
 
 
-    def __init__(self):
+    def __init__(self, cache):
         """
         Simply sets up the plugin so it can be used.
         """
         super().__init__()
+        self.LOCAL_CACHE = cache
         self.set_plugin_type('command')
         self.set_plugin_identity('cve')
         self.set_plugin_description('Allows CVE inspection based on a CVE number')
         self.set_help(self.INFO_HELP_STRING)
         self.register_error_code(self.INVALID_ARGUMENT_ERROR, self.INVALID_ARGUMENT_MESSAGE)
-
 
     def validate_command(self, args):
         """
@@ -120,14 +120,25 @@ class CVEPlugin(BasePlugin.BasePlugin):
         """
         This is called by run and should never be called directly!!!!
         """
+        cwe = CWE()
         print(f'CVE identifier: {cve.infos.id}')
-        print(f'\tPublished on:{cve.infos.published}')
-        print(f'\tLast modified on:{cve.infos.lastModified}')
+        print(f'\tPublished on: {cve.infos.published}')
+
+        if len(cve.cvss) > 0:
+            print(f'\tCVSS(s):')
+            for cvss in cve.cvss:
+                print(self._format_text(f'CVSSv{cvss.version}: {cvss.base_score} --- AV:{cvss.attack_vector}', tabulation=2))
+
+        print(f'\tCWE(s):')
+        for single_cwe in cve.cwe:
+            t = cwe.description_for_code(single_cwe)
+            print(self._format_text(f'{single_cwe} - {t if t is not None else "N/A"}', tabulation=2))
 
         print(f'\tDescription(s):')
         for d in cve.infos.descriptions:
-            print(f'\t{d.lang}')
-            print(self._format_text(d.value, tabulation=1))
+            if d.lang == 'en':
+                print(self._format_text(d.value, tabulation=2))
+                print()
 
 
     def _execute_single_verbose(self, cve):
@@ -159,23 +170,14 @@ class CVEPlugin(BasePlugin.BasePlugin):
             print(f'Searching NVD for {cve}...')
             r = call_cve_api(cve=cve)
 
-            if not 'vulnerabilities' in r:
-                raise Exception(f'No vulnerabilities found in {cve} NVD records')
-            self.LOCAL_CACHE[cve] = r['vulnerabilities'][0]
+            if len(r['vulnerabilities']) == 0:
+                raise Exception(f'No vulnerabilities found for {cve} in NVD records')
+            self.LOCAL_CACHE[cve] = CVE(r['vulnerabilities'][0])
             print(f'{cve} was added to local cache from NVD')
         else:
             print(f'Loading {cve} from local cache')
 
-        return CVE(self.LOCAL_CACHE[cve])
+        return self.LOCAL_CACHE[cve]
 
-
-    def _format_text(self, text, width=70, tabulation=0):
-        end_result = ''
-        wrapped_text = textwrap.wrap(text, width=width)
-        len_wrapped_text = len(wrapped_text)
-        for d in wrapped_text:
-            suffix = '' if len_wrapped_text == 1 else '\n'
-            end_result += f'{'\t'*tabulation}{d}{suffix}'
-        return end_result
 
 
