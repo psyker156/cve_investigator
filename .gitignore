@@ -90,3 +90,5 @@ data_source.csv
 
 #Avoid all *.pyc
 *.pyc
+
+.venv
