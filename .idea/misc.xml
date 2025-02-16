@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="Python 3.13 (CVEFetch)" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.13 (CVEFetch)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.13 (cve_investigator)" project-jdk-type="Python SDK" />
 </project>

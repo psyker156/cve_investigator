@@ -5,6 +5,7 @@ Copyright (C) 2025  Philippe Godbout
 
 import datetime
 import statistics
+from collections import defaultdict
 
 from NetworkServices.NISTAPIServices import call_cve_api
 from Parsers.CVE import CVE
@@ -27,9 +28,16 @@ class StatsPlugin(BasePlugin.BasePlugin):
                         '\t# stats set_end XXXX-XX-XX\t The end date for the statistics interval\n'
                         '\t# stats set_keyword AAAAAAA\t Adds a keyword to be used for CVE search\n'
                         '\t# stats add_cwe CWE-XXX\t Adds a CWE to the list of interesting CWE\n'
-                        '\t# stats crunch\t Runs the statistics based on the configuration\n'
                         '\t# stats clear_cache\t Remove all data from the local cache (required to start anew)\n'
-                        '\t# stats load_cache\t Loads/update all CVEs from the range to local cache (required')
+                        '\t# stats load_cache\t Loads/update all CVEs from the range to local cache (required\n'
+                        '\t# stats show_conifg\t Current state of plugin will be displayed including cache\n'
+                        '\t# stats omit_cve_status\t CVEs with the provided status will be ignored from stats\n'
+                        '\t# stats include_cve_status\t Reverts the effect of omit_cve_status\n'
+                        '\t# stats crunch_attack_vector\t Provides stats about the attack vectors\n'
+                        '\t# stats crunch_cwe_top_10\t Provides stats about the top 10 CWEs for CVEs in cache\n'
+                        '\t# stats crunch_cvss_version_representation\t General CVSS version adoption stats\n'
+                        '\t# stats crunch_exploit_status\t Provides CVSS v4.0 exploit status information\n'
+                        '\t# stats crunch_cvss_distribution\t Runs CVSS severity stats')
 
 
     INVALID_ARGUMENT_ERROR = -1
@@ -420,7 +428,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
         if not self.pre_crunch_setup():
             return self.INVALID_CONFIGURATION_ERROR
 
-        cwe_basic_infos = {}
+        cwe_basic_infos = defaultdict(int)
         unknown_cwe_cves = []
 
         print(self._format_text(f'Top 10 CWE for CVEs published between {self.start} and {self.end}:', width=100))
@@ -436,10 +444,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
             cwe_list = list(set(cwe_list))
 
             for cwe in cwe_list:
-                if cwe not in cwe_basic_infos:
-                    cwe_basic_infos[cwe] = 1
-                else:
-                    cwe_basic_infos[cwe] += 1
+                cwe_basic_infos[cwe] += 1
 
         print(self._format_text(f'The following CVE ({len(unknown_cwe_cves)}) do not have CWE information:', tabulation=1, width=100))
         print(self._format_text(f'{unknown_cwe_cves}', tabulation=2, width=100))
@@ -504,14 +509,12 @@ class StatsPlugin(BasePlugin.BasePlugin):
         if not self.pre_crunch_setup():
             return self.INVALID_CONFIGURATION_ERROR
 
-        exploit_status = {}
+        exploit_status = defaultdict(int)
 
         for cve in self.LOCAL_CACHE_FILTERED:
             for cvss in cve.cvss:
                 if cvss.version == '4.0':
-                    if cvss.exploit_maturity is not None and cvss.exploit_maturity not in exploit_status.keys():
-                        exploit_status[cvss.exploit_maturity] = 0
-                    elif cvss.exploit_maturity is not None:
+                    if cvss.exploit_maturity is not None:
                         exploit_status[cvss.exploit_maturity] += 1
 
         print(self._format_text(f'Exploit status for CVEs published between {self.start} and {self.end}:', width=100))

@@ -4,7 +4,7 @@ Copyright (C) 2025  Philippe Godbout
 """
 
 # The following are all constants used to locate data on the local hard drive
-CWE_INFO_LOCATION = 'cwe.csv'   # The separator is a : colon
+CWE_INFO_LOCATION = 'Parsers/cwe.csv'   # The separator is a : colon
 
 # Dict used to hold the CWE information after it is loaded
 CWE_INFO = None

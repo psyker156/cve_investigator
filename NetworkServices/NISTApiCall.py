@@ -10,7 +10,7 @@ import time
 from NetworkServices.CallUrlBasedRestAPI import call_url_based_rest_api
 
 # The following are all constants used to locate data on the local hard drive
-API_KEY_LOCATION = 'key.txt'
+API_KEY_LOCATION = 'NetworkServices/key.txt'
 
 def fetch_api_key():
         with open(API_KEY_LOCATION, 'r', encoding='utf-8') as f:
