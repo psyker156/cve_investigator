@@ -22,7 +22,7 @@ class InfoPlugin(BasePlugin.BasePlugin):
     """
     This plugin simply displays general information about cve_investigator
     """
-    ITERATION = 1
+    ITERATION = 2
 
     INFO_HELP_STRING = ('Info does not have any argument and must be called like:\n'
                         '# info\n'
@@ -33,12 +33,13 @@ class InfoPlugin(BasePlugin.BasePlugin):
     INVALID_ARGUMENT_MESSAGE = "Info must be called without any arguments"
 
 
-    def __init__(self, cache):
+    def __init__(self, cache, filtered_cache):
         """
         Simply sets up the plugin so it can be used.
         """
         super().__init__()
         self.LOCAL_CACHE = cache
+        self.LOCAL_CACHE_FILTERED = filtered_cache
         self.set_plugin_type('command')
         self.set_plugin_identity('info')
         self.set_plugin_description('Displays general information about cve_investigator')

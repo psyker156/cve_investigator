@@ -32,7 +32,7 @@ class DumperPlugin(BasePlugin.BasePlugin):
     """
     This plugin allows the user to explore CVEs
     """
-    ITERATION = 1
+    ITERATION = 2
 
     INFO_HELP_STRING = ('dumper has 1 command for now:\n'
                         '# dumper dump')
@@ -45,12 +45,13 @@ class DumperPlugin(BasePlugin.BasePlugin):
     COMMAND_TYPE_DUMP = 1
 
 
-    def __init__(self, cache):
+    def __init__(self, cache, filtered_cache):
         """
         Simply sets up the plugin so it can be used.
         """
         super().__init__()
         self.LOCAL_CACHE = cache
+        self.LOCAL_CACHE_FILTERED = filtered_cache
         self.set_plugin_type('command')
         self.set_plugin_identity('dumper')
         self.set_plugin_description('dump short description of all CVEs to drive')
@@ -63,13 +64,18 @@ class DumperPlugin(BasePlugin.BasePlugin):
         :param args: a list of commands including the command name
         :return: return_value, cve_number, sub_command
         """
-        return_value = self.COMMAND_TYPE_INVALID
+        return_value_a = self.COMMAND_TYPE_INVALID
+        return_value_b = False
 
         if len(args) == 2:
             if args[1] == 'dump':
-                return_value = self.COMMAND_TYPE_DUMP
+                return_value_a = self.COMMAND_TYPE_DUMP
+        elif len(args) == 3:
+            if args[1] == 'dump' and args[2] == 'filtered':
+                return_value_a = self.COMMAND_TYPE_DUMP
+                return_value_b = True
 
-        return return_value
+        return return_value_a, return_value_b
 
 
     def run(self, params=None):
@@ -79,14 +85,14 @@ class DumperPlugin(BasePlugin.BasePlugin):
         :param params: list, in this case the list should be empty!!!
         :return: 0 if properly called, self.INVALID_ARGUMENT_ERROR if wrongly called
         """
-        return_value = self.validate_command(params)
+        return_value, filtered = self.validate_command(params)
         if return_value == self.COMMAND_TYPE_DUMP:
-            self._dump_short_desc()
+            self._dump_short_desc(filtered)
             return_value = self.RUN_SUCCESS
         return return_value
 
 
-    def _dump_short_desc(self):
+    def _dump_short_desc(self, filtered=False):
         """
         This is called by run and should never be called directly!!!!
         """
@@ -94,8 +100,14 @@ class DumperPlugin(BasePlugin.BasePlugin):
         with open(path, 'w', encoding='utf-8') as f:
             with redirect_stdout(f):
                 cwe = CWE()
-                for cve_k in self.LOCAL_CACHE:
-                    cve = self.LOCAL_CACHE[cve_k]
+                cve_list = []
+                if not filtered:
+                    for cve_k in self.LOCAL_CACHE:
+                        cve_list.append(self.LOCAL_CACHE[cve_k])
+                else:
+                    cve_list = self.LOCAL_CACHE_FILTERED
+
+                for cve in cve_list:
                     print(f'CVE identifier: {cve.infos.id}')
                     print(f'\tPublished on: {cve.infos.published}')
 

@@ -31,7 +31,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
     """
     This plugin allows the user to easily obtain statistics about CVEs
     """
-    ITERATION = 1
+    ITERATION = 2
 
     INFO_HELP_STRING = ('The stats plugin needs to be configured in order to get the stats you are looking for\n'
                         'Here are the various configuration commands\n'
@@ -48,7 +48,8 @@ class StatsPlugin(BasePlugin.BasePlugin):
                         '\t# stats crunch_cwe_top_10\t Provides stats about the top 10 CWEs for CVEs in cache\n'
                         '\t# stats crunch_cvss_version_representation\t General CVSS version adoption stats\n'
                         '\t# stats crunch_exploit_status\t Provides CVSS v4.0 exploit status information\n'
-                        '\t# stats crunch_cvss_distribution\t Runs CVSS severity stats')
+                        '\t# stats crunch_cvss_distribution\t Runs CVSS severity stats'
+                        '\t# stats filter\t This runs automatically before any crunch command, run this if you want to use this filtering capability from a different plugin.')
 
 
     INVALID_ARGUMENT_ERROR = -1
@@ -74,6 +75,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
     COMMAND_CRUNCH_CWE_TOP_10 = 15              # This will return CWE top 10 along with number of instance
     COMMAND_CRUNCH_CVSS_VERSION_REPRESENTATION = 16     # Computes information about CVSS versions adoption
     COMMAND_CRUNCH_EXPLOIT_STATUS = 17          # At this moment, this returns stats about CVSS v4.0 exploit status
+    COMMAND_FILTER = 18                         # Runs the filtering stage so other commands can benefit from it
 
     VALID_COMMANDS = ['set_start',
                       'set_end',
@@ -91,16 +93,17 @@ class StatsPlugin(BasePlugin.BasePlugin):
                       'load_cache',
                       'show_config',
                       'omit_cve_status',
-                      'include_cve_status']
+                      'include_cve_status'
+                      'filter']
 
 
-    def __init__(self, cache):
+    def __init__(self, cache, filtered_cache):
         """
         Simply sets up the plugin so it can be used.
         """
         super().__init__()
         self.LOCAL_CACHE = cache
-        self.LOCAL_CACHE_FILTERED = []
+        self.LOCAL_CACHE_FILTERED = filtered_cache
 
         self.set_plugin_type('command')
         self.set_plugin_identity('stats')
@@ -255,7 +258,8 @@ class StatsPlugin(BasePlugin.BasePlugin):
                           'load_cache',
                           'show_config',
                           'omit_cve_status',
-                          'include_cve_status']
+                          'include_cve_status'
+                          'filter']
         :param args: a list of commands including the command name
         :return: commandType, param
         """
@@ -307,6 +311,8 @@ class StatsPlugin(BasePlugin.BasePlugin):
             return_value = self.COMMAND_OMIT_CVE_STATUS
         elif command == 'include_cve_status' and param in CVE.VALID_CVE_STATUS:
             return_value = self.COMMAND_INCLUDE_CVE_STATUS
+        elif command == 'filter' and param is None:
+            return_value = self.COMMAND_FILTER
 
         return return_value, param
 
@@ -355,6 +361,8 @@ class StatsPlugin(BasePlugin.BasePlugin):
             return_value = self.omit_cve_status(param)
         elif command_code == self.COMMAND_INCLUDE_CVE_STATUS:
             return_value = self.include_cve_status(param)
+        elif command_code == self.COMMAND_FILTER:
+            return_value = self.filter()
 
         return return_value
 
@@ -616,6 +624,12 @@ class StatsPlugin(BasePlugin.BasePlugin):
         return_value = self.INVALID_ARGUMENT_ERROR
         if param in self.omitted_cve_status:
             self.omitted_cve_status.remove(param)
+            return_value = self.RUN_SUCCESS
+        return return_value
+
+    def filter(self):
+        return_value = self.INVALID_CONFIGURATION_ERROR
+        if self.pre_crunch_setup():     # This does some validation then runs the cache filtering stage
             return_value = self.RUN_SUCCESS
         return return_value
 

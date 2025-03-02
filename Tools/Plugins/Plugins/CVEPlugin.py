@@ -29,7 +29,7 @@ class CVEPlugin(BasePlugin.BasePlugin):
     """
     This plugin allows the user to explore CVEs
     """
-    ITERATION = 1
+    ITERATION = 2
 
     INFO_HELP_STRING = ('CVE has mainly 3 modes of execution:\n'
                         '# cve CVE-XXXX-XXXX - Prints a summary of a given CVE if available\n'
@@ -52,12 +52,13 @@ class CVEPlugin(BasePlugin.BasePlugin):
     COMMAND_TYPE_SHOW = 4
 
 
-    def __init__(self, cache):
+    def __init__(self, cache, filtered_cache):
         """
         Simply sets up the plugin so it can be used.
         """
         super().__init__()
         self.LOCAL_CACHE = cache
+        self.LOCAL_CACHE_FILTERED = filtered_cache
         self.set_plugin_type('command')
         self.set_plugin_identity('cve')
         self.set_plugin_description('Allows CVE inspection based on a CVE number')

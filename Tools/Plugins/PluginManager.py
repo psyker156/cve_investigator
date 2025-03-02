@@ -29,7 +29,7 @@ class PluginManager(object):
     ways, this should be seen as the cve_investigator's core.
     """
 
-    ITERATION = 1   # This number is to be incremented each time base plugin mandatory
+    ITERATION = 2   # This number is to be incremented each time base plugin mandatory
                     # implementation changes.
 
     plugins = {}    # A dict of plugin such as {'pluginA_Identity': pluginObject, ...}
@@ -37,6 +37,7 @@ class PluginManager(object):
 
     def __init__(self):
         self.LOCAL_CACHE = {}
+        self.LOCAL_CACHE_FILTERED = []
         self.load_all_plugins()
 
         # After loading the plugins, they need to be validated to prevent runtime malfunction!
@@ -88,7 +89,7 @@ class PluginManager(object):
 
         # We only need an object for the module nothing more, these should all be self-contained
         single_plugin_main_class = getattr(module, module.__name__)
-        single_plugin = single_plugin_main_class(self.LOCAL_CACHE)      # create an instance of the plugin
+        single_plugin = single_plugin_main_class(self.LOCAL_CACHE, self.LOCAL_CACHE_FILTERED)      # create an instance of the plugin
 
         # From here the plugin is available to the plugin manager
         self.plugins[single_plugin.plugin_identity()] = single_plugin

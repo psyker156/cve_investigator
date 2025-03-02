@@ -21,7 +21,7 @@ class BasePlugin(object):
     This class is the parent class for all plugins. A valid plugin MUST inherit from BasePlugin.
     """
 
-    ITERATION = 1   # This number is to be incremented each time base plugin mandatory
+    ITERATION = 2   # This number is to be incremented each time base plugin mandatory
                     # implementation changes.
 
     # This first part is the plugin help menu, this must be set
