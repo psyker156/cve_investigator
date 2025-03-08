@@ -48,8 +48,10 @@ class StatsPlugin(BasePlugin.BasePlugin):
                         '\t# stats crunch_cwe_top_10\t Provides stats about the top 10 CWEs for CVEs in cache\n'
                         '\t# stats crunch_cvss_version_representation\t General CVSS version adoption stats\n'
                         '\t# stats crunch_exploit_status\t Provides CVSS v4.0 exploit status information\n'
-                        '\t# stats crunch_cvss_distribution\t Runs CVSS severity stats'
-                        '\t# stats filter\t This runs automatically before any crunch command, run this if you want to use this filtering capability from a different plugin.')
+                        '\t# stats crunch_cvss_distribution\t Runs CVSS severity stats\n'
+                        '\t# stats filter\t This runs automatically before any crunch command, run this if you want to use this filtering capability from a different plugin.\n'
+                        '\t# stats add_omitted_keyword\t This will add a keyword to the list of keywords that are not of interest\n'
+                        '\t# stats remove_omitted_keyword\t This will remove a keyword from the omitted list\n')
 
 
     INVALID_ARGUMENT_ERROR = -1
@@ -76,6 +78,8 @@ class StatsPlugin(BasePlugin.BasePlugin):
     COMMAND_CRUNCH_CVSS_VERSION_REPRESENTATION = 16     # Computes information about CVSS versions adoption
     COMMAND_CRUNCH_EXPLOIT_STATUS = 17          # At this moment, this returns stats about CVSS v4.0 exploit status
     COMMAND_FILTER = 18                         # Runs the filtering stage so other commands can benefit from it
+    COMMAND_ADD_OMITTED_KEYWORD = 19            # Adds a keyword to the omitted list for filtering
+    COMMAND_REMOVE_OMITTED_KEYWORD = 20         # Removes an omitted keyword from the list for filtering
 
     VALID_COMMANDS = ['set_start',
                       'set_end',
@@ -93,8 +97,10 @@ class StatsPlugin(BasePlugin.BasePlugin):
                       'load_cache',
                       'show_config',
                       'omit_cve_status',
-                      'include_cve_status'
-                      'filter']
+                      'include_cve_status',
+                      'filter',
+                      'add_omitted_keyword',
+                      'remove_omitted_keyword']
 
 
     def __init__(self, cache, filtered_cache):
@@ -115,6 +121,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
         self.start = None
         self.end = None
         self.keyword = []
+        self.omitted_keywords = []
         self.cwe = []
         self.omitted_cve_status = ['Rejected']
 
@@ -158,6 +165,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
         for cve in self.LOCAL_CACHE:
             usable_cve = self.LOCAL_CACHE[cve]
             if (self.in_date_range(usable_cve)
+                    and not self.contains_omitted_keywords(usable_cve)
                     and self.contains_keywords(usable_cve)
                     and self.contains_cwe(usable_cve)
                     and self.is_not_within_status(usable_cve)):
@@ -196,6 +204,22 @@ class StatsPlugin(BasePlugin.BasePlugin):
         for keyword in self.keyword:
             if keyword.casefold() not in descriptions_concatenation.casefold():
                 return_value = False
+                break
+
+        return return_value
+
+    def contains_omitted_keywords(self, usable_cve):
+        return_value = False
+        if len(self.omitted_keywords) == 0:
+            return return_value
+        descriptions_concatenation = ""
+
+        for description in usable_cve.infos.descriptions:
+            descriptions_concatenation += description.value + " "
+
+        for keyword in self.omitted_keywords:
+            if keyword.casefold() in descriptions_concatenation.casefold():
+                return_value = True
                 break
 
         return return_value
@@ -313,6 +337,10 @@ class StatsPlugin(BasePlugin.BasePlugin):
             return_value = self.COMMAND_INCLUDE_CVE_STATUS
         elif command == 'filter' and param is None:
             return_value = self.COMMAND_FILTER
+        elif command == 'add_omitted_keyword' and param is not None:
+            return_value = self.COMMAND_ADD_OMITTED_KEYWORD
+        elif command == 'remove_omitted_keyword' and param is not None:
+            return_value = self.COMMAND_REMOVE_OMITTED_KEYWORD
 
         return return_value, param
 
@@ -363,6 +391,10 @@ class StatsPlugin(BasePlugin.BasePlugin):
             return_value = self.include_cve_status(param)
         elif command_code == self.COMMAND_FILTER:
             return_value = self.filter()
+        elif command_code == self.COMMAND_ADD_OMITTED_KEYWORD:
+            return_value = self.add_omitted_keyword(param)
+        elif command_code == self.COMMAND_REMOVE_OMITTED_KEYWORD:
+            return_value = self.remove_omitted_keyword(param)
 
         return return_value
 
@@ -547,6 +579,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
         self.keyword = []
         self.cwe = []
         self.omitted_cve_status = []
+        self.omitted_keywords = []
         return self.RUN_SUCCESS
 
     def add_keyword(self, param):
@@ -560,6 +593,20 @@ class StatsPlugin(BasePlugin.BasePlugin):
         return_value = self.INVALID_ARGUMENT_ERROR
         if param in self.keyword:
             self.keyword.remove(param)
+            return_value = self.RUN_SUCCESS
+        return return_value
+
+    def add_omitted_keyword(self, param):
+        return_value = self.INVALID_ARGUMENT_ERROR
+        if param not in self.omitted_keywords:
+            self.omitted_keywords.append(param)
+            return_value = self.RUN_SUCCESS
+        return return_value
+
+    def remove_omitted_keyword(self, param):
+        return_value = self.INVALID_ARGUMENT_ERROR
+        if param in self.omitted_keywords:
+            self.omitted_keywords.remove(param)
             return_value = self.RUN_SUCCESS
         return return_value
 
@@ -607,6 +654,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
         print(f'{self._identity} Current configuration:')
         print(self._format_text(f'Start Data: {self.start}', tabulation=1))
         print(self._format_text(f'End Data: {self.end}', tabulation=1))
+        print(self._format_text(f'Omitted Keywords: {self.omitted_keywords}', tabulation=1))
         print(self._format_text(f'Keywords: {str(self.keyword)}', tabulation=1))
         print(self._format_text(f'CWEs: {str(self.cwe)}', tabulation=1))
         print(self._format_text(f'Omitted CVE Statuses: {str(self.omitted_cve_status)}', tabulation=1))
