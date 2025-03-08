@@ -15,8 +15,10 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import datetime
+import json
 import statistics
 from collections import defaultdict
+import os
 
 from NetworkServices.NISTAPIServices import call_cve_api
 from Parsers.CVE import CVE
@@ -51,7 +53,8 @@ class StatsPlugin(BasePlugin.BasePlugin):
                         '\t# stats crunch_cvss_distribution\t Runs CVSS severity stats\n'
                         '\t# stats filter\t This runs automatically before any crunch command, run this if you want to use this filtering capability from a different plugin.\n'
                         '\t# stats add_omitted_keyword\t This will add a keyword to the list of keywords that are not of interest\n'
-                        '\t# stats remove_omitted_keyword\t This will remove a keyword from the omitted list\n')
+                        '\t# stats remove_omitted_keyword\t This will remove a keyword from the omitted list\n'
+                        '\t# stats file_based_comparison [filename]\t This will return quantitative information for each keywords within a file\n')
 
 
     INVALID_ARGUMENT_ERROR = -1
@@ -80,6 +83,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
     COMMAND_FILTER = 18                         # Runs the filtering stage so other commands can benefit from it
     COMMAND_ADD_OMITTED_KEYWORD = 19            # Adds a keyword to the omitted list for filtering
     COMMAND_REMOVE_OMITTED_KEYWORD = 20         # Removes an omitted keyword from the list for filtering
+    COMMAND_FILE_BASED_COMPARISON = 21          # Quickly gets stats based on filters defined in a file
 
     VALID_COMMANDS = ['set_start',
                       'set_end',
@@ -100,7 +104,8 @@ class StatsPlugin(BasePlugin.BasePlugin):
                       'include_cve_status',
                       'filter',
                       'add_omitted_keyword',
-                      'remove_omitted_keyword']
+                      'remove_omitted_keyword',
+                      'file_based_comparison']
 
 
     def __init__(self, cache, filtered_cache):
@@ -158,7 +163,7 @@ class StatsPlugin(BasePlugin.BasePlugin):
             self.cwe = []
             self.omitted_cve_status = []
         """
-        self.LOCAL_CACHE_FILTERED = []
+        self.LOCAL_CACHE_FILTERED.clear()
         print(f'Filtering cache based on current configuration:')
         self.show_config()
         print(f'Filtering...')
@@ -267,23 +272,26 @@ class StatsPlugin(BasePlugin.BasePlugin):
         """
         This is a localized command parser that every plugin must implement.
         VALID_COMMANDS = ['set_start',
-                          'set_end',
-                          'crunch_cvss_distribution',
-                          'crunch_attack_vector',
-                          'crunch_cwe_top_10',
-                          'crunch_cvss_version_representation',
-                          'crunch_exploit_status',
-                          'reset',
-                          'add_keyword',
-                          'remove_keyword',
-                          'add_cwe',
-                          'remove_cwe',
-                          'clear_cache',
-                          'load_cache',
-                          'show_config',
-                          'omit_cve_status',
-                          'include_cve_status'
-                          'filter']
+                      'set_end',
+                      'crunch_cvss_distribution',
+                      'crunch_attack_vector',
+                      'crunch_cwe_top_10',
+                      'crunch_cvss_version_representation',
+                      'crunch_exploit_status',
+                      'reset',
+                      'add_keyword',
+                      'remove_keyword',
+                      'add_cwe',
+                      'remove_cwe',
+                      'clear_cache',
+                      'load_cache',
+                      'show_config',
+                      'omit_cve_status',
+                      'include_cve_status',
+                      'filter',
+                      'add_omitted_keyword',
+                      'remove_omitted_keyword',
+                      'file_based_comparison']
         :param args: a list of commands including the command name
         :return: commandType, param
         """
@@ -341,6 +349,9 @@ class StatsPlugin(BasePlugin.BasePlugin):
             return_value = self.COMMAND_ADD_OMITTED_KEYWORD
         elif command == 'remove_omitted_keyword' and param is not None:
             return_value = self.COMMAND_REMOVE_OMITTED_KEYWORD
+        elif command == 'file_based_comparison' and param is not None and os.path.isfile(param):
+            return_value = self.COMMAND_FILE_BASED_COMPARISON
+
 
         return return_value, param
 
@@ -395,6 +406,8 @@ class StatsPlugin(BasePlugin.BasePlugin):
             return_value = self.add_omitted_keyword(param)
         elif command_code == self.COMMAND_REMOVE_OMITTED_KEYWORD:
             return_value = self.remove_omitted_keyword(param)
+        elif command_code == self.COMMAND_FILE_BASED_COMPARISON:
+            return_value = self.file_based_comparison(param)
 
         return return_value
 
@@ -679,6 +692,23 @@ class StatsPlugin(BasePlugin.BasePlugin):
         return_value = self.INVALID_CONFIGURATION_ERROR
         if self.pre_crunch_setup():     # This does some validation then runs the cache filtering stage
             return_value = self.RUN_SUCCESS
+        return return_value
+
+    def file_based_comparison(self, param):
+        return_value = self.RUN_SUCCESS
+        config = None
+
+        try:
+            with open(param, 'r') as f:
+                config = f.readlines()
+
+            for single_config in config:
+                self.keyword = []
+                self.add_keyword(single_config.strip())
+                self.filter()
+        except Exception:
+            return_value = self.RUN_UNKNOWN_ERROR
+
         return return_value
 
 

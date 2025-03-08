@@ -38,6 +38,7 @@ class BasePlugin(object):
                            'writer']
     RUN_SUCCESS = 0
     RUN_NOT_IMPLEMENTED = -1000
+    RUN_UNKNOWN_ERROR = -1001
 
     _identity_max_len = 15
     _description_max_len = 60

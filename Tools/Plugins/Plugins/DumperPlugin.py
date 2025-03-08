@@ -34,8 +34,9 @@ class DumperPlugin(BasePlugin.BasePlugin):
     """
     ITERATION = 2
 
-    INFO_HELP_STRING = ('dumper has 1 command for now:\n'
-                        '# dumper dump')
+    INFO_HELP_STRING = ('dumper has 1 command for now which will dump the cache:\n'
+                        '# dumper dump\n'
+                        'It can however be used with the "filtered" option to dump the filtered cache')
 
 
     INVALID_ARGUMENT_ERROR = -1
