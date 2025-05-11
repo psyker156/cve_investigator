@@ -54,6 +54,8 @@ class CVE:
         self.cvss = []
         self.cwe = []
         self.status = 'Unknown'
+        self.published_date = None
+        self.cve_number = None
 
         # We want to be able to call the same constructor with either a string or json
         # The code bellow is what allows for this.
@@ -87,6 +89,12 @@ class CVE:
             for weakness in cve_json['weaknesses']:
                 for description in weakness['description']:
                     self.cwe.append(description['value'])
+
+        if 'published' in cve_json.keys():
+            self.published_date = cve_json['published']
+
+        if 'id' in cve_json.keys():
+            self.cve_number = cve_json['id']
 
     def is_cve_valid(self, cve):
         """

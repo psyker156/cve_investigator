@@ -56,6 +56,7 @@ class Console:
                     print(self.pm.plugins[command_name].error_message(result))
             except BaseException as e:
                 print(e)
+                raise(e)
 
         print('')
         print('Closing Console...')

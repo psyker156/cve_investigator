@@ -645,20 +645,37 @@ class StatsPlugin(BasePlugin.BasePlugin):
     def load_cache(self):
         return_value = self.INVALID_CONFIGURATION_ERROR
         if self.start is not None and self.end is not None:
-            print(f'Loading CVEs from NVD for interval between {self.start} and {self.end}...')
-            total_results = 5000
-            start_index = 0
-            print(f'Progression 0%')
-            while start_index < total_results:
-                cves = call_cve_api(start=self.start, end=self.end, index=start_index)
-                results_per_page = cves['resultsPerPage']
-                total_results = cves['totalResults']
-                start_index += results_per_page
 
-                vulnerabilities = cves['vulnerabilities']
-                for cve in vulnerabilities:
-                    self.LOCAL_CACHE[cve['cve']['id']] = CVE(cve)
-                print(f'Progression {int((start_index/total_results)*100)}%')
+            start_date = datetime.datetime.strptime(self.start, '%Y-%m-%d')
+            end_date = datetime.datetime.strptime(self.end, '%Y-%m-%d')
+            time_delta = datetime.timedelta(weeks=5)
+            at_date = start_date
+
+            interation_required = ((end_date - start_date)/time_delta) + 1
+            at_iteration = 0
+
+            print(f'Loading CVEs from NVD for interval between {self.start} and {self.end}...')
+            while at_date <= end_date:
+                sub_group_start = str(at_date).split(' ')[0]
+                sub_group_end = str(end_date).split(' ')[0]
+                if (at_date + time_delta) < end_date:
+                    sub_group_end = str(at_date + time_delta).split(' ')[0]
+                at_date += time_delta
+
+                total_results = 50000
+                start_index = 0
+                while start_index < total_results:
+                    cves = call_cve_api(start=sub_group_start, end=sub_group_end, index=start_index)
+                    results_per_page = cves['resultsPerPage']
+                    total_results = cves['totalResults']
+                    start_index += results_per_page
+
+                    vulnerabilities = cves['vulnerabilities']
+                    for cve in vulnerabilities:
+                        self.LOCAL_CACHE[cve['cve']['id']] = CVE(cve)
+                at_iteration += 1
+                print(f'Progression {int((at_iteration/interation_required)*100)}%')
+
             print(f'Done loading CVEs for interval between {self.start} and {self.end}')
             return_value = self.RUN_SUCCESS
         return return_value

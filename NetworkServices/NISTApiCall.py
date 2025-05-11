@@ -41,6 +41,14 @@ def call_nist_api(use_api_key, url, safe=False):
     else:
         response = call_url_based_rest_api(url, safe=safe)
 
-    time.sleep(6)   # This is based on NIST recommendation: https://nvd.nist.gov/general/news/API-Key-Announcement
+    time.sleep(3)   # This is based on NIST recommendation: https://nvd.nist.gov/general/news/API-Key-Announcement
 
-    return json.loads(response)
+    result = None
+    try:
+        result = json.loads(response)
+    except json.decoder.JSONDecodeError as e:
+        char_position = e.pos
+        response = response[:char_position] + response[char_position+1:]
+        result = json.loads(response)
+
+    return result
