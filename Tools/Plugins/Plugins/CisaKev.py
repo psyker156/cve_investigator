@@ -38,7 +38,8 @@ class CisaKev(BasePlugin.BasePlugin):
                         '# cisakev CVE-XXXX-XXXX - Checks if a given CVE is part of KEV\n'
                         '# cisakev time_to_exploitation - Computes time to exploitation stats for every CVE in the kev\n'
                         '# cisakev time_to_exploitation_from YYYY-MM-DD - Computes time to exploitation stats from a given date\n'
-                        '# cisakev time_to_exploitation_cache - Computes time to exploitation stats CVEs present in cache\n'
+                        '# cisakev time_to_exploitation_cache - Computes time to exploitation stats for CVEs present in cache\n'
+                        '# cisakev time_to_exploitation_cache_filtered - Computes time to exploitation stats for CVEs present in filtered cache\n'
                         '# cisakev refresh_kev_cache - Gets the latest KEV file and keep in local plugin cache')
 
 
@@ -54,7 +55,8 @@ class CisaKev(BasePlugin.BasePlugin):
     COMMAND_TYPE_TIME_TO_EXPLOITATION = 2
     COMMAND_TYPE_TIME_TO_EXPLOITATION_FROM = 3
     COMMAND_TYPE_TIME_TO_EXPLOITATION_CACHE = 4
-    COMMAND_TYPE_REFRESH_KEV_CACHE = 5
+    COMMAND_TYPE_TIME_TO_EXPLOITATION_CACHE_FILTERED = 5
+    COMMAND_TYPE_REFRESH_KEV_CACHE = 6
 
 
     def __init__(self, cache, filtered_cache):
@@ -99,6 +101,8 @@ class CisaKev(BasePlugin.BasePlugin):
             date = args[2]
         elif len_args == 2 and args[1] == "time_to_exploitation_cache":
             return_value = self.COMMAND_TYPE_TIME_TO_EXPLOITATION_CACHE
+        elif len_args == 2 and args[1] == "time_to_exploitation_cache_filtered":
+            return_value = self.COMMAND_TYPE_TIME_TO_EXPLOITATION_CACHE_FILTERED
         elif len_args == 2 and args[1] == "refresh_kev_cache":
             return_value = self.COMMAND_TYPE_REFRESH_KEV_CACHE
 
@@ -123,6 +127,8 @@ class CisaKev(BasePlugin.BasePlugin):
             return_value = self._time_to_exploitation(date)
         elif valid_command == self.COMMAND_TYPE_TIME_TO_EXPLOITATION_CACHE:
             return_value = self._time_to_exploitation_cache()
+        elif valid_command == self.COMMAND_TYPE_TIME_TO_EXPLOITATION_CACHE_FILTERED:
+            return_value = self._time_to_exploitation_cache(filtered=True)
         elif valid_command == self.COMMAND_TYPE_REFRESH_KEV_CACHE:
             self._refresh_kev_cache()
             return_value = self.RUN_SUCCESS
@@ -181,14 +187,20 @@ class CisaKev(BasePlugin.BasePlugin):
         return_value = self.RUN_SUCCESS
         return return_value
 
-    def _time_to_exploitation_cache(self):
+    def _time_to_exploitation_cache(self, filtered=False):
         return_value = self.INVALID_ARGUMENT_ERROR
         self._refresh_kev_cache()
         output = []
 
+        cve_cache = self.LOCAL_CACHE
+        if filtered:
+            cve_cache = {}
+            for cve in self.LOCAL_CACHE_FILTERED:
+                cve_cache[cve.infos.id] = cve
+
         for cve_number in self.LOCAL_KEV_CACHE['kev'].keys():
-            if cve_number in self.LOCAL_CACHE:
-                cve = self.LOCAL_CACHE[cve_number]
+            if cve_number in cve_cache:
+                cve = cve_cache[cve_number]
                 cve_date = cve.published_date.split('T')[0]
                 kev_date = self.LOCAL_KEV_CACHE['kev'][cve.cve_number].date_added
                 delta = self._date_comparator(cve_date, kev_date)
