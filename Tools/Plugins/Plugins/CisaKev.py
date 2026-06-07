@@ -174,11 +174,13 @@ class CisaKev(BasePlugin.BasePlugin):
         self._refresh_kev_cache()
         output = []
 
+        output.append(f'CVE\tCVE-Date\tKEV-Date\tDelta (Days)')
+
         for cve_number in self.LOCAL_KEV_CACHE['kev'].keys():
             _, cve_date, kev_date = self._get_cve_published_and_kev_dates(cve_number)
             if cve_date is not None and kev_date is not None and self._date_comparator(date_from, cve_date) >= 0:
                 delta = self._date_comparator(cve_date, kev_date)
-                output.append(f'{cve_number};{cve_date};{kev_date};{delta}')
+                output.append(f'{cve_number}\t{cve_date}\t{kev_date}\t{delta}')
                 print(f'{cve_number} added to output')
 
         for line in output:
@@ -191,6 +193,8 @@ class CisaKev(BasePlugin.BasePlugin):
         return_value = self.INVALID_ARGUMENT_ERROR
         self._refresh_kev_cache()
         output = []
+
+        output.append(f'CVE\t\t\t\tCVE-Date\tKEV-Date\tDelta (Days)')
 
         cve_cache = self.LOCAL_CACHE
         if filtered:
